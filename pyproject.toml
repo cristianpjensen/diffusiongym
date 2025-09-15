@@ -17,12 +17,14 @@ flow_gym = { path = ".", editable = true }
 torch = { version = ">=2.3.1,<2.6.0", index = "https://download.pytorch.org/whl/cu121" }
 torchvision = { version = ">=0.18.1", index = "https://download.pytorch.org/whl/cu121" }
 diffusers = "*"
+accelerate = "*"
 
 [tool.pixi.target.osx.pypi-dependencies]
 # OSX has no CUDA support so use the CPU here
 torch = { version = ">=2.3.1,<2.6.0", index = "https://download.pytorch.org/whl/cpu" }
 torchvision = { version = ">=0.18.1", index = "https://download.pytorch.org/whl/cpu" }
 diffusers = "*"
+accelerate = "*"
 
 [tool.pixi.environments]
 default = { solve-group = "default" }

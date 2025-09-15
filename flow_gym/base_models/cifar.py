@@ -17,6 +17,16 @@ class CIFARBaseModel(BaseModel[torch.Tensor]):
     """Pre-trained diffusion model on CIFAR-10 32x32.
 
     Uses the `google/ddpm-cifar10-32` model from the `diffusers` library.
+
+    Examples
+    --------
+    >>> device = torch.device("cpu")
+    >>> model = CIFARBaseModel().to(device)
+    >>> x = model.sample_p0(8).to(device)
+    >>> t = torch.rand(8, device=device)
+    >>> output = model(x, t)
+    >>> output.shape
+    torch.Size([8, 3, 32, 32])
     """
 
     def __init__(self) -> None:
@@ -47,13 +57,6 @@ class CIFARBaseModel(BaseModel[torch.Tensor]):
         Notes
         -----
         The base distribution p0 is a standard Gaussian distribution.
-
-        Examples
-        --------
-        >>> model = CIFARBaseModel()
-        >>> samples = model.sample_p0(8)
-        >>> samples.shape
-        torch.Size([8, 3, 32, 32])
         """
         return torch.randn(n, 3, 32, 32)
 
@@ -73,15 +76,6 @@ class CIFARBaseModel(BaseModel[torch.Tensor]):
         -------
         output : torch.Tensor, shape (n, 3, 32, 32)
             Output of the model.
-
-        Examples
-        --------
-        >>> model = CIFARBaseModel()
-        >>> x = torch.randn(8, 3, 32, 32)
-        >>> t = torch.rand(8)
-        >>> output = model(x, t)
-        >>> output.shape
-        torch.Size([8, 3, 32, 32])
         """
         k = self.scheduler.model_input(t)
         return cast("torch.Tensor", self.unet(x, k, **kwargs).sample)
