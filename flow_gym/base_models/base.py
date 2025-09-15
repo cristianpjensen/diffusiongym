@@ -1,0 +1,67 @@
+"""Abstract base class for base models used in flow matching and diffusion."""
+
+from abc import ABC, abstractmethod
+from typing import Any, Generic, TypeVar
+
+import torch
+from torch import nn
+
+from flow_gym.schedulers import Scheduler
+
+T = TypeVar("T")
+
+
+class BaseModel(ABC, nn.Module, Generic[T]):
+    """Abstract base class for base models used in flow matching and diffusion."""
+
+    @property
+    @abstractmethod
+    def scheduler(self) -> Scheduler:
+        """Base model-dependent scheduler used for sampling."""
+
+    @abstractmethod
+    def sample_p0(self, n: int) -> T:
+        """Sample n data points from the base distribution p0.
+
+        Parameters
+        ----------
+        n : int
+            Number of samples to draw.
+
+        Returns
+        -------
+        samples : T
+            Samples from the base distribution p0.
+        """
+
+    @abstractmethod
+    def forward(self, x: T, t: torch.Tensor, **kwargs: dict[str, Any]) -> T:
+        """Forward pass of the base model.
+
+        Parameters
+        ----------
+        x : T
+            Input data.
+        t : torch.Tensor, shape (n,)
+            Time steps, values in [0, 1].
+
+        Returns
+        -------
+        output : T
+            Output of the model.
+        """
+
+    def postprocess(self, x: T) -> T:
+        """Postprocess samples x_1 (e.g., decode with VAE).
+
+        Parameters
+        ----------
+        x : T
+            Input data to postprocess.
+
+        Returns
+        -------
+        output : T
+            Postprocessed output.
+        """
+        return x
