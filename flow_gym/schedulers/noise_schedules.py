@@ -2,31 +2,12 @@
 
 import torch
 
-from .base import NoiseSchedule, Scheduler
+from flow_gym.utils import DataType
+
+from .base import NoiseSchedule
 
 
-class MemorylessNoiseSchedule(NoiseSchedule):
-    r"""Memoryless noise schedule based on the scheduler's eta function.
-
-    This schedule ensures that :math:`x_0` and :math:`x_1` are independent, which is necessary for
-    unbiased generative optimization.
-
-    Parameters
-    ----------
-    scheduler : Scheduler
-        Scheduler to use for computing :math:`\eta_t`.
-
-    """
-
-    def __init__(self, scheduler: Scheduler):
-        self.scheduler = scheduler
-
-    def __call__(self, t: torch.Tensor) -> torch.Tensor:
-        """Memoryless noise schedule."""
-        return torch.sqrt(2 * self.scheduler.eta(t))
-
-
-class ConstantNoiseSchedule(NoiseSchedule):
+class ConstantNoiseSchedule(NoiseSchedule[DataType]):
     """Constant noise schedule with fixed sigma.
 
     Parameters
@@ -38,12 +19,13 @@ class ConstantNoiseSchedule(NoiseSchedule):
     def __init__(self, sigma: float):
         self.sigma = sigma
 
-    def __call__(self, t: torch.Tensor) -> torch.Tensor:
+    def __call__(self, t: torch.Tensor) -> DataType:
         """Constant noise schedule."""
-        return self.sigma * torch.ones_like(t)
+        raise NotImplementedError
+        # return self.sigma * torch.ones_like(t)
 
 
-class LinearNoiseSchedule(NoiseSchedule):
+class LinearNoiseSchedule(NoiseSchedule[DataType]):
     """Linear noise schedule between sigma_start and sigma_end.
 
     Parameters
@@ -58,6 +40,7 @@ class LinearNoiseSchedule(NoiseSchedule):
         self.sigma_start = sigma_start
         self.sigma_end = sigma_end
 
-    def __call__(self, t: torch.Tensor) -> torch.Tensor:
+    def __call__(self, t: torch.Tensor) -> DataType:
         """Linear interpolation between sigma_start and sigma_end."""
-        return self.sigma_start + t * (self.sigma_end - self.sigma_start)
+        raise NotImplementedError
+        # return self.sigma_start + t * (self.sigma_end - self.sigma_start)

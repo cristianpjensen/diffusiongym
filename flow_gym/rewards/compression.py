@@ -3,7 +3,9 @@
 import torch
 import torchvision
 
-from .base import NonDifferentiableReward
+from flow_gym.utils import FGTensor
+
+from .base import Reward
 
 
 def _bits_per_pixel(imgs: torch.Tensor, quality_level: int) -> torch.Tensor:
@@ -24,7 +26,7 @@ def _bits_per_pixel(imgs: torch.Tensor, quality_level: int) -> torch.Tensor:
     return bits_per_pixel
 
 
-class IncompressionReward(NonDifferentiableReward):
+class IncompressionReward(Reward[FGTensor]):
     """Incompression reward for image models.
 
     Typically, when this reward is maximized, it encourages the model to produce images that have
@@ -47,7 +49,7 @@ class IncompressionReward(NonDifferentiableReward):
     def __init__(self, quality_level: int):
         self.quality_level = quality_level
 
-    def __call__(self, imgs: torch.Tensor) -> torch.Tensor:
+    def __call__(self, imgs: FGTensor) -> torch.Tensor:
         """Compute the incompression reward for a batch of images.
 
         Parameters
@@ -63,7 +65,7 @@ class IncompressionReward(NonDifferentiableReward):
         return _bits_per_pixel(imgs, self.quality_level)
 
 
-class CompressionReward(NonDifferentiableReward):
+class CompressionReward(Reward[FGTensor]):
     """Compression reward for image models.
 
     Typically, when this reward is maximized, it encourages the model to produce images that look
@@ -86,7 +88,7 @@ class CompressionReward(NonDifferentiableReward):
     def __init__(self, quality_level: int):
         self.quality_level = quality_level
 
-    def __call__(self, imgs: torch.Tensor) -> torch.Tensor:
+    def __call__(self, imgs: FGTensor) -> torch.Tensor:
         """Compute the compression reward for a batch of images.
 
         Parameters

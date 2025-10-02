@@ -6,6 +6,7 @@ import torch
 from diffusers.pipelines.ddpm.pipeline_ddpm import DDPMPipeline
 
 from flow_gym.schedulers import DiffusionScheduler
+from flow_gym.utils import FGTensor
 
 from .base import BaseModel
 
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
     from diffusers.models.unets.unet_2d import UNet2DModel
 
 
-class CIFARBaseModel(BaseModel[torch.Tensor]):
+class CIFARBaseModel(BaseModel[FGTensor]):
     """Pre-trained diffusion model on CIFAR-10 32x32.
 
     Uses the `google/ddpm-cifar10-32` model from the `diffusers` library.
@@ -41,8 +42,8 @@ class CIFARBaseModel(BaseModel[torch.Tensor]):
         """Scheduler used for sampling."""
         return self._scheduler
 
-    def sample_p0(self, n: int) -> torch.Tensor:
-        """Sample n datapoints from the base distribution p0.
+    def sample_p0(self, n: int) -> FGTensor:
+        """Sample n datapoints from the base distribution :math:`p_0`.
 
         Parameters
         ----------
@@ -52,15 +53,15 @@ class CIFARBaseModel(BaseModel[torch.Tensor]):
         Returns
         -------
         samples : torch.Tensor, shape (n, 3, 32, 32)
-            Samples from the base distribution p0.
+            Samples from the base distribution :math:`p_0`.
 
         Notes
         -----
-        The base distribution p0 is a standard Gaussian distribution.
+        The base distribution :math:`p_0` is a standard Gaussian distribution.
         """
-        return torch.randn(n, 3, 32, 32)
+        return FGTensor(torch.randn(n, 3, 32, 32))
 
-    def forward(self, x: torch.Tensor, t: torch.Tensor, **kwargs: dict[str, Any]) -> torch.Tensor:
+    def forward(self, x: FGTensor, t: torch.Tensor, **kwargs: dict[str, Any]) -> FGTensor:
         r"""Forward pass of the model, outputting :math:`\epsilon(x_t, t)`.
 
         Parameters
@@ -78,4 +79,5 @@ class CIFARBaseModel(BaseModel[torch.Tensor]):
             Output of the model.
         """
         k = self.scheduler.model_input(t)
-        return cast("torch.Tensor", self.unet(x, k, **kwargs).sample)
+        output = cast("torch.Tensor", self.unet(x, k, **kwargs).sample)
+        return FGTensor(output)

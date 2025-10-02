@@ -18,6 +18,8 @@ torch = { version = ">=2.3.1,<2.6.0", index = "https://download.pytorch.org/whl/
 torchvision = { version = ">=0.18.1", index = "https://download.pytorch.org/whl/cu121" }
 diffusers = "*"
 accelerate = "*"
+dgl = "*"
+rdkit = "*"
 
 [tool.pixi.target.osx.pypi-dependencies]
 # OSX has no CUDA support so use the CPU here
@@ -75,6 +77,7 @@ ignore = [
     "PLR0914", # Too many locals
     "PLR0915", # Too many statements
     "PLR1702", # Too many nested-blocks
+    "D105", # Docstring in dunder methods
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -90,7 +93,11 @@ pretty = true
 [[tool.mypy.overrides]]
 module = [
     "torchvision",
-    "torchvision.*"
+    "torchvision.*",
+    "dgl",
+    "dgl.*",
+    "rdkit",
+    "rdkit.*"
 ]
 ignore_missing_imports = true
 
