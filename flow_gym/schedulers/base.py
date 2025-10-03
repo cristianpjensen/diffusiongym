@@ -12,7 +12,7 @@ class NoiseSchedule(ABC, Generic[DataType]):
     """Abstract base class for noise schedules."""
 
     @abstractmethod
-    def __call__(self, t: torch.Tensor) -> DataType:
+    def __call__(self, x: DataType, t: torch.Tensor) -> DataType:
         """Compute the noise level at time t."""
 
 
@@ -41,24 +41,24 @@ class Scheduler(ABC, Generic[DataType]):
         self._noise_schedule = schedule
 
     @abstractmethod
-    def alpha(self, t: torch.Tensor) -> DataType:
+    def alpha(self, x: DataType, t: torch.Tensor) -> DataType:
         r""":math:`\alpha_t`."""
 
     @abstractmethod
-    def alpha_dot(self, t: torch.Tensor) -> DataType:
+    def alpha_dot(self, x: DataType, t: torch.Tensor) -> DataType:
         r""":math:`\dot{\alpha}_t`."""
 
-    def beta(self, t: torch.Tensor) -> DataType:
+    def beta(self, x: DataType, t: torch.Tensor) -> DataType:
         r""":math:`\beta_t = 1-\alpha_t`."""
-        return 1 - self.alpha(t)
+        return 1 - self.alpha(x, t)
 
-    def beta_dot(self, t: torch.Tensor) -> DataType:
+    def beta_dot(self, x: DataType, t: torch.Tensor) -> DataType:
         r""":math:`\dot{\beta}_t = -\dot{\alpha}_t`."""
-        return -self.alpha_dot(t)
+        return -self.alpha_dot(x, t)
 
-    def sigma(self, t: torch.Tensor) -> DataType:
+    def sigma(self, x: DataType, t: torch.Tensor) -> DataType:
         r""":math:`\sigma(t)` noise schedule."""
-        return self.noise_schedule(t)
+        return self.noise_schedule(x, t)
 
     def model_input(self, t: torch.Tensor) -> torch.Tensor:
         """Input to the model at time t.
@@ -67,16 +67,16 @@ class Scheduler(ABC, Generic[DataType]):
         """
         return t
 
-    def kappa(self, t: torch.Tensor) -> DataType:
+    def kappa(self, x: DataType, t: torch.Tensor) -> DataType:
         r""":math:`\kappa_t` as defined in [Adjoint Matching](https://openreview.net/forum?id=xQBRrtQM8u)."""
-        return self.alpha_dot(t) / self.alpha(t)
+        return self.alpha_dot(x, t) / self.alpha(x, t)
 
-    def eta(self, t: torch.Tensor) -> DataType:
+    def eta(self, x: DataType, t: torch.Tensor) -> DataType:
         r""":math:`\eta_t` as defined in [Adjoint Matching](https://openreview.net/forum?id=xQBRrtQM8u)."""
-        alpha = self.alpha(t)
-        alpha_dot = self.alpha_dot(t)
-        beta = self.beta(t)
-        beta_dot = self.beta_dot(t)
+        alpha = self.alpha(x, t)
+        alpha_dot = self.alpha_dot(x, t)
+        beta = self.beta(x, t)
+        beta_dot = self.beta_dot(x, t)
         return beta * ((alpha_dot / alpha) * beta - beta_dot)
 
 
@@ -96,6 +96,6 @@ class MemorylessNoiseSchedule(NoiseSchedule[DataType]):
     def __init__(self, scheduler: Scheduler[DataType]):
         self.scheduler = scheduler
 
-    def __call__(self, t: torch.Tensor) -> DataType:
+    def __call__(self, x: DataType, t: torch.Tensor) -> DataType:
         """Memoryless noise schedule."""
-        return (2 * self.scheduler.eta(t)) ** 0.5
+        return (2 * self.scheduler.eta(x, t)) ** 0.5

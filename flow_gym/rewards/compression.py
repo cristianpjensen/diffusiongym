@@ -12,18 +12,16 @@ def _bits_per_pixel(imgs: torch.Tensor, quality_level: int) -> torch.Tensor:
     IMG_BATCH_NDIM = 4
     assert imgs.ndim == IMG_BATCH_NDIM, "imgs should be a batch of images with shape (B, C, H, W)"
 
-    # encode each image to jpeg
-    imgs_uint8 = (imgs.clamp(0, 1) * 255).to(torch.uint8)
-    encoded_bytes = torchvision.io.encode_jpeg(list(imgs_uint8), quality=quality_level)
-
-    # calculate reward as bits/pixel
+    batch_size = imgs.shape[0]
     num_pixels = imgs.shape[2] * imgs.shape[3]
-    encoded_bytes = torch.tensor(
-        [len(b) for b in encoded_bytes], device=imgs.device, dtype=torch.float32
-    )
-    bits_per_pixel = encoded_bytes * 8.0 / num_pixels
+    bpp = torch.zeros(batch_size, device=imgs.device)
 
-    return bits_per_pixel
+    imgs_uint8 = (imgs.clamp(0, 1) * 255).to(torch.uint8).cpu()
+    for i in range(batch_size):
+        encoded_bytes = torchvision.io.encode_jpeg(imgs_uint8[i], quality=quality_level)
+        bpp[i] = 8 * len(encoded_bytes) / num_pixels
+
+    return bpp.to(imgs.device)
 
 
 class IncompressionReward(Reward[FGTensor]):
@@ -62,7 +60,7 @@ class IncompressionReward(Reward[FGTensor]):
         rewards : torch.Tensor, shape (B,)
             Incompression reward (bits per pixel) for each image.
         """
-        return _bits_per_pixel(imgs, self.quality_level)
+        return _bits_per_pixel(torch.Tensor(imgs), self.quality_level)
 
 
 class CompressionReward(Reward[FGTensor]):
@@ -101,4 +99,4 @@ class CompressionReward(Reward[FGTensor]):
         rewards : torch.Tensor, shape (B,)
             Compression reward (negative bits per pixel) for each image.
         """
-        return -_bits_per_pixel(imgs, self.quality_level)
+        return -_bits_per_pixel(torch.Tensor(imgs), self.quality_level)

@@ -2,9 +2,10 @@
 
 from abc import ABC, abstractmethod
 from itertools import pairwise
-from typing import Any, Generic, Optional, Protocol
+from typing import Any, Generic, Iterable, Optional, Protocol
 
 import torch
+from tqdm import tqdm
 
 from flow_gym.base_models import BaseModel
 from flow_gym.rewards import Reward
@@ -43,7 +44,7 @@ class BaseEnvironment(ABC, Generic[DataType]):
         self.reward = reward
         self.discretization_steps = discretization_steps
         self._policy: Optional[Policy[DataType]] = None
-        self._additive_policy: Optional[Policy[DataType]] = None
+        self._control_policy: Optional[Policy[DataType]] = None
 
     @property
     def scheduler(self) -> Scheduler[DataType]:
@@ -52,7 +53,7 @@ class BaseEnvironment(ABC, Generic[DataType]):
 
     @property
     def policy(self) -> Policy[DataType]:
-        """Current policy of the environment."""
+        """Current policy (replacement of base model) of the environment."""
         if self._policy is None:
             return self.base_model
 
@@ -69,19 +70,19 @@ class BaseEnvironment(ABC, Generic[DataType]):
         return self.policy is not None
 
     @property
-    def additive_policy(self) -> Optional[Policy[DataType]]:
-        """Current additive policy of the environment."""
-        return self._additive_policy
+    def control_policy(self) -> Optional[Policy[DataType]]:
+        """Current control policy u(x, t) of the environment."""
+        return self._control_policy
 
-    @additive_policy.setter
-    def additive_policy(self, additive_policy: Optional[Policy[DataType]]) -> None:
-        """Set the current additive policy of the environment."""
-        self._additive_policy = additive_policy
+    @control_policy.setter
+    def control_policy(self, control_policy: Optional[Policy[DataType]]) -> None:
+        """Set the current control policy of the environment."""
+        self._control_policy = control_policy
 
     @property
-    def is_additive_policy_set(self) -> bool:
+    def is_control_policy_set(self) -> bool:
         """Whether a custom policy has been set."""
-        return self.additive_policy is not None
+        return self.control_policy is not None
 
     @abstractmethod
     def drift(
@@ -125,15 +126,15 @@ class BaseEnvironment(ABC, Generic[DataType]):
         diffusion : DataType
             The diffusion term at time t.
         """
-        return self.scheduler.sigma(t) * x.ones_like()
+        return self.scheduler.sigma(x, t)
 
     @torch.no_grad()
     def sample(
         self,
         n: int,
-        device: Optional[torch.device] = None,
+        pbar: bool = True,
         **kwargs: dict[str, Any],
-    ) -> tuple[list[DataType], torch.Tensor, torch.Tensor]:
+    ) -> tuple[DataType, list[DataType], torch.Tensor, torch.Tensor, torch.Tensor, dict[str, Any]]:
         r"""Sample n trajectories from the environment.
 
         Parameters
@@ -141,8 +142,8 @@ class BaseEnvironment(ABC, Generic[DataType]):
         n : int
             Number of trajectories to sample.
 
-        device : torch.device, default "cpu"
-            The device to perform computations on.
+        pbar : bool, default: True
+            Whether to display a progress bar.
 
         **kwargs : dict[str, Any]
             Additional keyword arguments to pass to the base model at every timestep (e.g. text
@@ -150,29 +151,38 @@ class BaseEnvironment(ABC, Generic[DataType]):
 
         Returns
         -------
+        sample : DataType
+            The final states :math:`x_1` of the sampled trajectory.
+
         trajectories : list of DataType, length discretization_steps
             The sampled trajectories, containing x_t.
+
+        running_costs : torch.Tensor, shape (discretization_steps, n)
+            The running costs :math:`L(x_t, t)` of the policy at each timestep.
+
+        rewards : torch.Tensor, shape (n,)
+            The final reward for each trajectory, i.e., :math:`r(x_1)`.
 
         costs : torch.Tensor, shape (discretization_steps, n)
             The costs associated with each trajectory, i.e., :math:`c_t = \int_t^1 \| a_s(x_s, s) -
             \hat{a}_s(x_s, s) \|^2 ds - r(x_1)`.
 
-        rewards : torch.Tensor, shape (n,)
-            The final reward for each trajectory, i.e., :math:`r(x_1)`.
-
+        kwargs : dict[str, Any]
+            Additional keyword arguments passed to the base model at every timestep.
         """
-        if device is None:
-            device = torch.device("cpu")
-
         x = self.base_model.sample_p0(n)
         trajectories = [x]
 
         running_costs = torch.zeros(self.discretization_steps, n)
 
         t = torch.linspace(0, 1, self.discretization_steps + 1)
-        for i, (t0, t1) in enumerate(pairwise(t)):
+        iterator: Iterable[tuple[int, tuple[Any, Any]]] = enumerate(pairwise(t))
+        if pbar:
+            iterator = tqdm(iterator, total=self.discretization_steps)
+
+        for i, (t0, t1) in iterator:
             dt = t1 - t0
-            t_curr = t0 * torch.ones(n, device=device)
+            t_curr = t0 * torch.ones(n, device=self.base_model.device)
 
             # Discrete step of SDE
             drift, running_cost = self.drift(x, t_curr, **kwargs)
@@ -183,9 +193,9 @@ class BaseEnvironment(ABC, Generic[DataType]):
             trajectories.append(x)
 
         x = self.base_model.postprocess(x)
-        rewards = self.reward(x)
+        rewards = self.reward(x).cpu()
         running_costs = running_costs / self.discretization_steps
-        running_costs = torch.cat([running_costs, -rewards], dim=1)
+        running_costs = torch.cat([running_costs, -rewards.unsqueeze(0)], dim=0)
         # Reverse cumulative sum
         costs = running_costs.flip(0).cumsum(0).flip(0)
-        return trajectories, costs, rewards
+        return x, trajectories, running_costs, rewards, costs, kwargs

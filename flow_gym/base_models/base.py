@@ -1,7 +1,7 @@
 """Abstract base class for base models used in flow matching and diffusion."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Generic
+from typing import Any, Generic, Optional
 
 import torch
 from torch import nn
@@ -12,6 +12,14 @@ from flow_gym.utils import DataType
 
 class BaseModel(ABC, nn.Module, Generic[DataType]):
     """Abstract base class for base models used in flow matching and diffusion."""
+
+    def __init__(self, device: Optional[torch.device]):
+        super().__init__()
+
+        if device is None:
+            device = torch.device("cpu")
+
+        self.device = device
 
     @property
     @abstractmethod

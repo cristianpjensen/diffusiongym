@@ -46,6 +46,9 @@ ruff = ">=0.11"
 mypy = ">=1.15"
 pre-commit = ">=4.2"
 
+[tool.pixi.dependencies]
+types-tqdm = ">=4.67.0.20250809,<5"
+
 [tool.ruff]
 line-length = 100
 

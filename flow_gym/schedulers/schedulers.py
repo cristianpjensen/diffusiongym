@@ -4,7 +4,7 @@ from typing import cast
 
 import torch
 
-from flow_gym.utils import FGTensor
+from flow_gym.utils import FGTensor, append_dims
 
 from .base import Scheduler
 
@@ -17,13 +17,13 @@ class OptimalTransportScheduler(Scheduler[FGTensor]):
         \alpha_t = t, \quad \beta_t = 1 - t, \quad \dot{\alpha}_t = 1, \quad \dot{\beta}_t = -1.
     """
 
-    def alpha(self, t: torch.Tensor) -> FGTensor:
+    def alpha(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
         r""":math:`\alpha_t = t`."""
-        return FGTensor(t)
+        return FGTensor(append_dims(t, x.ndim))
 
-    def alpha_dot(self, t: torch.Tensor) -> FGTensor:
+    def alpha_dot(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
         r""":math:`\dot{\alpha}_t = 1`."""
-        return FGTensor(torch.ones_like(t))
+        return FGTensor(append_dims(torch.ones_like(t), x.ndim))
 
 
 class DiffusionScheduler(Scheduler[FGTensor]):
@@ -47,29 +47,29 @@ class DiffusionScheduler(Scheduler[FGTensor]):
         self.alpha_bar_dot = self.K * (self.alpha_bar_shifted - self.alpha_bar)
 
     def _get_index(self, t: torch.Tensor) -> torch.Tensor:
-        k = ((1 - t) * self.K + 0.5).long().clamp(0, self.K)
+        k = ((1 - t) * self.K + 0.5).long().clamp(0, self.K).cpu()
         return cast("torch.Tensor", k)
 
     def model_input(self, t: torch.Tensor) -> torch.Tensor:
         """Input to the model at time t that encodes the timestep."""
-        return self._get_index(t)
+        return self._get_index(t).to(t.device)
 
-    def alpha(self, t: torch.Tensor) -> FGTensor:
+    def alpha(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
         r""":math:`\alpha_t`."""
         k = self._get_index(t)
-        return FGTensor(torch.sqrt(self.alpha_bar[k]))
+        return FGTensor(append_dims(torch.sqrt(self.alpha_bar[k]), x.ndim))
 
-    def beta(self, t: torch.Tensor) -> FGTensor:
+    def beta(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
         r""":math:`\beta_t`."""
         k = self._get_index(t)
-        return FGTensor(torch.sqrt(1 - self.alpha_bar[k]))
+        return FGTensor(append_dims(torch.sqrt(1 - self.alpha_bar[k]), x.ndim))
 
-    def alpha_dot(self, t: torch.Tensor) -> FGTensor:
+    def alpha_dot(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
         r""":math:`\dot{\alpha}_t`."""
         k = self._get_index(t)
-        return FGTensor(0.5 * self.alpha_bar_dot[k] / self.alpha(t))
+        return FGTensor(0.5 * append_dims(self.alpha_bar_dot[k], x.ndim) / self.alpha(x, t))
 
-    def beta_dot(self, t: torch.Tensor) -> FGTensor:
+    def beta_dot(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
         r""":math:`\dot{\beta}_t`."""
         k = self._get_index(t)
-        return FGTensor(-0.5 * self.alpha_bar_dot[k] / self.beta(t))
+        return FGTensor(-0.5 * append_dims(self.alpha_bar_dot[k], x.ndim) / self.beta(x, t))

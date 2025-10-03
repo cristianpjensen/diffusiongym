@@ -1,6 +1,6 @@
 """Pre-trained base model for CIFAR-10."""
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 import torch
 from diffusers.pipelines.ddpm.pipeline_ddpm import DDPMPipeline
@@ -21,20 +21,23 @@ class CIFARBaseModel(BaseModel[FGTensor]):
 
     Examples
     --------
-    >>> device = torch.device("cpu")
-    >>> model = CIFARBaseModel().to(device)
-    >>> x = model.sample_p0(8).to(device)
-    >>> t = torch.rand(8, device=device)
-    >>> output = model(x, t)
-    >>> output.shape
-    torch.Size([8, 3, 32, 32])
+    ```python
+    device = torch.device("cpu")
+    base_model = CIFARBaseModel().to(device)
+    reward = CompressionReward()
+    env = EpsilonEnvironment(base_model, reward, discretization_steps=100)
+    policy = copy.deepcopy(base_model)
+    env.policy = policy
+    ```
     """
 
-    def __init__(self) -> None:
-        super().__init__()
+    def __init__(self, device: Optional[torch.device]):
+        super().__init__(device)
 
-        pipe = DDPMPipeline.from_pretrained("google/ddpm-cifar10-32")
+        pipe = DDPMPipeline.from_pretrained("google/ddpm-cifar10-32").to(device)
         self.unet: UNet2DModel = pipe.unet
+
+        pipe.scheduler.alphas_cumprod = pipe.scheduler.alphas_cumprod.to(device)
         self._scheduler = DiffusionScheduler(pipe.scheduler.alphas_cumprod)
 
     @property
@@ -59,7 +62,7 @@ class CIFARBaseModel(BaseModel[FGTensor]):
         -----
         The base distribution :math:`p_0` is a standard Gaussian distribution.
         """
-        return FGTensor(torch.randn(n, 3, 32, 32))
+        return FGTensor(torch.randn(n, 3, 32, 32, device=self.device))
 
     def forward(self, x: FGTensor, t: torch.Tensor, **kwargs: dict[str, Any]) -> FGTensor:
         r"""Forward pass of the model, outputting :math:`\epsilon(x_t, t)`.

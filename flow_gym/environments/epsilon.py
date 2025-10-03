@@ -9,7 +9,7 @@ from flow_gym.utils import DataType
 from .base import BaseEnvironment
 
 
-class ScoreEnvironment(BaseEnvironment[DataType]):
+class EpsilonEnvironment(BaseEnvironment[DataType]):
     r"""Environment with tensor samples and base model predict score :math:`\nabla \log p_t(x)`.
 
     Parameters
@@ -52,6 +52,7 @@ class ScoreEnvironment(BaseEnvironment[DataType]):
         running_cost : torch.Tensor, shape (n,)
             Running cost :math:`L(x_t, t)` of the policy for the given (state, timestep)-pair.
         """
+        beta = self.scheduler.beta(x, t)
         kappa = self.scheduler.kappa(x, t)
         eta = self.scheduler.eta(x, t)
         sigma = self.scheduler.sigma(x, t)
@@ -59,7 +60,7 @@ class ScoreEnvironment(BaseEnvironment[DataType]):
         action = self.policy(x, t, **kwargs)
 
         a = kappa
-        b = 0.5 * sigma * sigma + eta
+        b = -(0.5 * sigma * sigma + eta) / beta
         drift = a * x + b * action
 
         control = x.zeros_like()
