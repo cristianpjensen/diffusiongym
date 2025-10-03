@@ -49,6 +49,7 @@ class BaseModel(ABC, nn.Module, Generic[DataType]):
         ----------
         x : DataType
             Input data.
+
         t : torch.Tensor, shape (n,)
             Time steps, values in [0, 1].
 
