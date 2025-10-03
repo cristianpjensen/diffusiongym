@@ -14,6 +14,7 @@ class OptimalTransportScheduler(Scheduler[FGTensor]):
 
     Schedule:
     .. math::
+
         \alpha_t = t, \quad \beta_t = 1 - t, \quad \dot{\alpha}_t = 1, \quad \dot{\beta}_t = -1.
     """
 

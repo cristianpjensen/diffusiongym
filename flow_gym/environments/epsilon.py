@@ -34,7 +34,7 @@ class EpsilonEnvironment(BaseEnvironment[DataType]):
 
         Parameters
         ----------
-        x : torch.Tensor, shape (n, *action_shape)
+        x : DataType
             The current state.
 
         t : torch.Tensor, shape (n,)
@@ -46,7 +46,7 @@ class EpsilonEnvironment(BaseEnvironment[DataType]):
 
         Returns
         -------
-        drift : torch.Tensor, shape (n, *action_shape)
+        drift : DataType
             The drift term at state x and time t.
 
         running_cost : torch.Tensor, shape (n,)

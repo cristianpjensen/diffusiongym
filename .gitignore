@@ -178,3 +178,5 @@ pyrightconfig.json
 # Pixi
 .pixi
 *.ipynb
+
+docs/api/generated/

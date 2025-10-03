@@ -19,10 +19,11 @@ author = "Cristian Perez Jensen"
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
 extensions = [
-    "sphinx.ext.autodoc",  # Core library to pull in documentation from docstrings
-    "sphinx.ext.napoleon",  # Support for Google and NumPy style docstrings
-    "sphinx.ext.viewcode",  # Add links to highlighted source code
-    "myst_parser",  # To write docs in Markdown
+    "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+    "sphinx.ext.viewcode",
+    "sphinx.ext.autosummary",
+    "myst_parser",
 ]
 
 templates_path = ["_templates"]
@@ -33,6 +34,10 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "furo"
-html_static_path = ["_static"]
+html_static_path = []
 
-sys.path.insert(0, os.path.abspath("../../flow_gym"))  # For a src layout
+sys.path.insert(0, os.path.abspath(".."))
+
+autosummary_generate = True
+autosummary_format_signature = ""
+add_module_names = False
