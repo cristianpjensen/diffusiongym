@@ -2,7 +2,7 @@
 
 import torch
 
-from flow_gym.utils import DataType
+from flow_gym.types import DataType
 
 from .base import NoiseSchedule
 

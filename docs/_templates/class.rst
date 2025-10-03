@@ -1,4 +1,4 @@
-{{ fullname | escape | underline}}
+{{ objname | escape | underline}}
 
 .. currentmodule:: {{ module }}
 
@@ -6,4 +6,3 @@
     :members:
     :undoc-members:
     :show-inheritance:
-    :inherited-members:

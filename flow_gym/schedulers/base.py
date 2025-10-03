@@ -5,7 +5,7 @@ from typing import Generic, Optional
 
 import torch
 
-from flow_gym.utils import DataType
+from flow_gym.types import DataType
 
 
 class NoiseSchedule(ABC, Generic[DataType]):

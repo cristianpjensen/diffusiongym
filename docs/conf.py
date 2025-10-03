@@ -29,6 +29,9 @@ extensions = [
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
+# Suppress warnings
+suppress_warnings = ["ref.ref", "autosummary"]
+
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
@@ -41,3 +44,8 @@ sys.path.insert(0, os.path.abspath(".."))
 autosummary_generate = True
 autosummary_format_signature = ""
 add_module_names = False
+
+# Autodoc settings
+autodoc_default_options = {
+    "inherited-members": False,
+}

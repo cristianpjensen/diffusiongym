@@ -3,7 +3,7 @@
 import torch
 import torchvision
 
-from flow_gym.utils import FGTensor
+from flow_gym.types import FGTensor
 
 from .base import Reward
 

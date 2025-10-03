@@ -4,7 +4,8 @@ from typing import cast
 
 import torch
 
-from flow_gym.utils import FGTensor, append_dims
+from flow_gym.types import FGTensor
+from flow_gym.utils import append_dims
 
 from .base import Scheduler
 

@@ -7,7 +7,7 @@ import torch
 from torch import nn
 
 from flow_gym.schedulers import Scheduler
-from flow_gym.utils import DataType
+from flow_gym.types import DataType
 
 
 class BaseModel(ABC, nn.Module, Generic[DataType]):

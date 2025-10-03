@@ -6,7 +6,7 @@ import torch
 from diffusers.pipelines.ddpm.pipeline_ddpm import DDPMPipeline
 
 from flow_gym.schedulers import DiffusionScheduler
-from flow_gym.utils import FGTensor
+from flow_gym.types import FGTensor
 
 from .base import BaseModel
 

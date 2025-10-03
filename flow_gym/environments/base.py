@@ -10,7 +10,7 @@ from tqdm import tqdm
 from flow_gym.base_models import BaseModel
 from flow_gym.rewards import Reward
 from flow_gym.schedulers import Scheduler
-from flow_gym.utils import DataType
+from flow_gym.types import DataType
 
 
 class Policy(Protocol[DataType]):
