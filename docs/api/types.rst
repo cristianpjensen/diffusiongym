@@ -8,6 +8,6 @@ Types
     :template: class.rst
     :nosignatures:
 
-    ArithmeticType
+    DataProtocol
     DataType
     FGTensor

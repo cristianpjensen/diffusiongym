@@ -1,11 +1,9 @@
-Base Models
+Molecules (optional)
 ===========
 
-.. currentmodule:: flow_gym.base_models
+.. currentmodule:: flow_gym.molecules
 
 .. autosummary::
     :toctree: generated/
     :template: class.rst
     :nosignatures:
-
-    BaseModel

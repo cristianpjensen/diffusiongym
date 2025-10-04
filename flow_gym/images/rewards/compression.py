@@ -1,11 +1,9 @@
-"""Compression-based reward implementations for flow_gym."""
+"""Compression-based reward implementations."""
 
 import torch
 import torchvision
 
-from flow_gym.types import FGTensor
-
-from .base import Reward
+from flow_gym import FGTensor, Reward
 
 
 def _bits_per_pixel(imgs: torch.Tensor, quality_level: int) -> torch.Tensor:

@@ -10,5 +10,3 @@ Rewards
 
     Reward
     DifferentiableReward
-    CompressionReward
-    IncompressionReward

@@ -5,10 +5,7 @@ from typing import TYPE_CHECKING, Any, Optional, cast
 import torch
 from diffusers.pipelines.ddpm.pipeline_ddpm import DDPMPipeline
 
-from flow_gym.schedulers import DiffusionScheduler
-from flow_gym.types import FGTensor
-
-from .base import BaseModel
+from flow_gym import BaseModel, DiffusionScheduler, FGTensor
 
 if TYPE_CHECKING:
     from diffusers.models.unets.unet_2d import UNet2DModel

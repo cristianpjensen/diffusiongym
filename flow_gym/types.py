@@ -1,12 +1,17 @@
 """Custom types for flow_gym."""
 
-from typing import Protocol, Self, TypeVar, Union
+from typing import Protocol, TypeVar, Union
 
 import torch
+from typing_extensions import Self
 
 
-class ArithmeticType(Protocol):
-    """Protocol for types that support basic arithmetic operations."""
+class DataProtocol(Protocol):
+    """Protocol defining the required interface for data types in flow_gym.
+
+    Types implementing this protocol must support arithmetic operations, factory methods
+    (randn_like, ones_like, zeros_like), and batch reduction operations (batch_sum).
+    """
 
     def __add__(self, other: Union[Self, float, torch.Tensor]) -> Self: ...
     def __sub__(self, other: Union[Self, float, torch.Tensor]) -> Self: ...
@@ -40,7 +45,7 @@ class ArithmeticType(Protocol):
         ...
 
 
-DataType = TypeVar("DataType", bound=ArithmeticType)
+DataType = TypeVar("DataType", bound=DataProtocol)
 
 
 class FGTensor(torch.Tensor):
@@ -48,14 +53,14 @@ class FGTensor(torch.Tensor):
 
     @staticmethod
     def __new__(cls, tensor: torch.Tensor) -> "FGTensor":
-        """Create a new FlowGymTensor from a torch.Tensor."""
+        """Create a new FGTensor from a torch.Tensor."""
         if isinstance(tensor, FGTensor):
             return tensor
 
         return tensor.as_subclass(FGTensor)
 
     def _wrap_result(self, result: torch.Tensor) -> "FGTensor":
-        """Wrap a tensor result as FlowGymTensor."""
+        """Wrap a tensor result as FGTensor."""
         if isinstance(result, FGTensor):
             return result
         return result.as_subclass(FGTensor)
