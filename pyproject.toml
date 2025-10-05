@@ -6,35 +6,24 @@ version = "0.0.1"
 readme = "README.md"
 keywords = []
 authors = [{name = "Cristian Perez Jensen"}]
-requires-python = ">=3.8,<3.13"
-
-[project.optional-dependencies]
-images = [
-    "diffusers>=0.21.0,<0.34",
-    "accelerate",
-]
-molecules = [
-    "rdkit",
-    "dgl",
-    "flowmol @ git+https://github.com/Dunni3/FlowMol.git@418a3e5",
-]
-all = [
-    "flow_gym[molecules]",
-    "flow_gym[images]",
-]
+requires-python = ">=3.8,<3.12"
 
 [tool.pixi.project]
 channels = ["conda-forge"]
 platforms = ["linux-64"]
 
 [tool.pixi.dependencies]
-pytorch = { version = ">=2.1,<2.5" }
-torchvision = { version = ">=0.18.1" }
 tqdm = "*"
 types-tqdm = ">=4.67.0.20250809,<5"
 typing-extensions = "*"
 
+[tool.pixi.pypi-options]
+extra-index-urls = ["https://download.pytorch.org/whl/cu121"]
+find-links = [{ url = "https://data.dgl.ai/wheels/torch-2.3/cu121/repo.html" }]
+
 [tool.pixi.pypi-dependencies]
+torch = { version = "==2.3.1", index = "https://download.pytorch.org/whl/cu121" }
+torchvision = { version = "==0.18.1", index = "https://download.pytorch.org/whl/cu121" }
 flow_gym = { path = ".", editable = true }
 
 [tool.pixi.environments]
@@ -42,16 +31,21 @@ default = { solve-group = "default" }
 dev = { features = ["dev"], solve-group = "default"}
 molecules = { features = ["dev", "molecules"], solve-group = "default"}
 images = { features = ["dev", "images"], solve-group = "default"}
-full = { features = ["dev", "full"], solve-group = "default"}
+full = { features = ["dev", "molecules", "images"], solve-group = "default"}
+
+[tool.pixi.feature.molecules.dependencies]
+rdkit = "==2023.9.4"
 
 [tool.pixi.feature.molecules.pypi-dependencies]
-flow_gym = { path = ".", editable = true, extras = ["molecules"] }
+dgl = { version = "==2.4.0" }
+flowmol = { git = "https://github.com/Dunni3/FlowMol.git", rev = "418a3e5" }
+
+[tool.pixi.feature.molecules.activation]
+env = { DGLBACKEND = "pytorch" }
 
 [tool.pixi.feature.images.pypi-dependencies]
-flow_gym = { path = ".", editable = true, extras = ["images"] }
-
-[tool.pixi.feature.full.pypi-dependencies]
-flow_gym = { path = ".", editable = true, extras = ["all"] }
+diffusers = "==0.33.1"
+accelerate = "*"
 
 [tool.pixi.feature.dev.tasks]
 fmt = { cmd="ruff format ." }
@@ -131,6 +125,10 @@ ignore_missing_imports = true
 testpaths = ["tests", "flow_gym"]
 addopts = "--doctest-modules"
 doctest_optionflags = "NORMALIZE_WHITESPACE"
+filterwarnings = [
+    "ignore:Can't initialize NVML:UserWarning:torch.cuda",
+    "ignore:invalid escape sequence:DeprecationWarning:dgl.backend.backend",
+]
 
 [tool.hatch.metadata]
 allow-direct-references = true
