@@ -4,34 +4,89 @@ from typing import Any, Callable, Union
 
 import dgl
 import torch
+from torch_scatter import scatter
 
 
 class FGGraph:
-    """A wrapper around DGLGraph that supports required factory methods."""
+    """A wrapper around DGLGraph that supports required factory methods.
 
-    def __init__(self, graph: dgl.DGLGraph):
-        """Create a new FGGraph from a DGLGraph.
+    Parameters
+    ----------
+    graph : dgl.DGLGraph
+        The graph to wrap.
 
-        Parameters
-        ----------
-        graph : dgl.DGLGraph
-            The graph to wrap.
-        """
-        object.__setattr__(self, "graph", graph)
+    ue_mask : torch.Tensor, shape (num_edges,)
+        Mask indicating upper edges in the graph.
+
+    n_idx : torch.Tensor, shape (num_nodes,)
+        Batch indices for nodes.
+
+    e_idx : torch.Tensor, shape (num_edges,)
+        Batch indices for edges.
+    """
+
+    def __init__(
+        self,
+        graph: dgl.DGLGraph,
+        ue_mask: torch.Tensor,
+        n_idx: torch.Tensor,
+        e_idx: torch.Tensor,
+    ):
+        self.graph = graph
+        self.ue_mask = ue_mask
+        self.n_idx = n_idx
+        self.e_idx = e_idx
 
     def __getattr__(self, name: str) -> Any:
-        """Delegate attribute access to the wrapped graph."""
         return getattr(self.graph, name)
 
     def __setattr__(self, name: str, value: Any) -> None:
-        """Delegate attribute setting to the wrapped graph."""
         if name == "graph":
             object.__setattr__(self, name, value)
         else:
             setattr(self.graph, name, value)
 
+    def _get_empty_graph(self) -> dgl.DGLGraph:
+        """Get an empty graph with the same structure as Self."""
+        # Clone the graph structure
+        empty_graph = dgl.graph(self.graph.edges(), num_nodes=self.graph.num_nodes())
+
+        # Preserve batch information
+        if self.graph.batch_size > 1:
+            empty_graph.set_batch_num_nodes(self.graph.batch_num_nodes())
+            empty_graph.set_batch_num_edges(self.graph.batch_num_edges())
+
+        return empty_graph
+
+    def _apply_unary_op(self, op: Callable[[torch.Tensor], torch.Tensor]) -> "FGGraph":
+        """Apply a unary operation to graph data.
+
+        Parameters
+        ----------
+        op : (torch.Tensor) -> torch.Tensor
+            Unary operation to apply.
+
+        Returns
+        -------
+        output : FGGraph
+            New graph with operation applied.
+        """
+        res = self._get_empty_graph()
+
+        for key, val in self.graph.ndata.items():
+            if isinstance(val, torch.Tensor):
+                res.ndata[key] = op(val)
+
+        for key, val in self.graph.edata.items():
+            if isinstance(val, torch.Tensor):
+                res.edata[key] = op(val)
+
+        return FGGraph(res, self.ue_mask, self.n_idx, self.e_idx)
+
     def _apply_binary_op(
-        self, other: Union["FGGraph", float, torch.Tensor], op: Callable[[Any, Any], Any]
+        self,
+        other: Union["FGGraph", float, torch.Tensor],
+        op: Callable[[Any, Any], Any],
     ) -> "FGGraph":
         """Apply a binary operation to graph data.
 
@@ -39,124 +94,76 @@ class FGGraph:
         ----------
         other : FGGraph, float, or torch.Tensor
             The other operand.
-        op : callable
-            Binary operation to apply (e.g., operator.add, operator.sub).
+
+        op : (any, any) -> any
+            Binary operation to apply.
 
         Returns
         -------
-        FGGraph
+        output : FGGraph
             New graph with operation applied.
         """
+        res = self._get_empty_graph()
+
         if isinstance(other, FGGraph):
-            # Create a copy of self.graph
-            result_graph = dgl.graph(self.graph.edges(), num_nodes=self.graph.num_nodes())
-
-            # Apply operation to all ndata from self
-            for key in self.graph.ndata.keys():
+            for key, val in self.graph.ndata.items():
                 if key in other.graph.ndata:
-                    result_graph.ndata[key] = op(self.graph.ndata[key], other.graph.ndata[key])
+                    res.ndata[key] = op(val, other.graph.ndata[key])
                 else:
-                    result_graph.ndata[key] = self.graph.ndata[key]
+                    res.ndata[key] = val
 
-            # Apply operation to all edata from self
-            for key in self.graph.edata.keys():
+            for key, val in self.graph.edata.items():
                 if key in other.graph.edata:
-                    result_graph.edata[key] = op(self.graph.edata[key], other.graph.edata[key])
+                    res.edata[key] = op(val, other.graph.edata[key])
                 else:
-                    result_graph.edata[key] = self.graph.edata[key]
+                    res.edata[key] = val
+        else:
+            for key, val in self.graph.ndata.items():
+                res.ndata[key] = op(val, other)
 
-            return FGGraph(result_graph)
+            for key, val in self.graph.edata.items():
+                res.edata[key] = op(val, other)
 
-        # Apply operation with scalar/tensor to all data
-        result_graph = dgl.graph(self.graph.edges(), num_nodes=self.graph.num_nodes())
-
-        for key in self.graph.ndata.keys():
-            result_graph.ndata[key] = op(self.graph.ndata[key], other)
-
-        for key in self.graph.edata.keys():
-            result_graph.edata[key] = op(self.graph.edata[key], other)
-
-        return FGGraph(result_graph)
+        return FGGraph(res, self.ue_mask, self.n_idx, self.e_idx)
 
     def __add__(self, other: Union["FGGraph", float, torch.Tensor]) -> "FGGraph":
-        """Add graph data together."""
         return self._apply_binary_op(other, lambda a, b: a + b)
 
     def __sub__(self, other: Union["FGGraph", float, torch.Tensor]) -> "FGGraph":
-        """Subtract graph data."""
         return self._apply_binary_op(other, lambda a, b: a - b)
 
     def __mul__(self, other: Union["FGGraph", float, torch.Tensor]) -> "FGGraph":
-        """Multiply graph data."""
         return self._apply_binary_op(other, lambda a, b: a * b)
 
     def __truediv__(self, other: Union["FGGraph", float, torch.Tensor]) -> "FGGraph":
-        """Divide graph data."""
         return self._apply_binary_op(other, lambda a, b: a / b)
 
-    def __neg__(self) -> "FGGraph":
-        """Negate graph data."""
-        result_graph = dgl.graph(self.graph.edges(), num_nodes=self.graph.num_nodes())
-
-        for key in self.graph.ndata.keys():
-            result_graph.ndata[key] = -self.graph.ndata[key]
-
-        for key in self.graph.edata.keys():
-            result_graph.edata[key] = -self.graph.edata[key]
-
-        return FGGraph(result_graph)
-
     def __radd__(self, other: Union["FGGraph", float, torch.Tensor]) -> "FGGraph":
-        """Right addition."""
         return self._apply_binary_op(other, lambda a, b: b + a)
 
     def __rsub__(self, other: Union["FGGraph", float, torch.Tensor]) -> "FGGraph":
-        """Right subtraction."""
         return self._apply_binary_op(other, lambda a, b: b - a)
 
     def __rmul__(self, other: Union["FGGraph", float, torch.Tensor]) -> "FGGraph":
-        """Right multiplication."""
         return self._apply_binary_op(other, lambda a, b: b * a)
 
     def __pow__(self, power: float) -> "FGGraph":
-        """Raise graph data to a power."""
         return self._apply_binary_op(power, lambda a, b: a**b)
+
+    def __neg__(self) -> "FGGraph":
+        return self._apply_unary_op(lambda x: -x)
 
     def randn_like(self) -> "FGGraph":
         """Generate random normal noise with the same shape and type as self."""
-        result_graph = dgl.graph(self.graph.edges(), num_nodes=self.graph.num_nodes())
-
-        for key in self.graph.ndata.keys():
-            result_graph.ndata[key] = torch.randn_like(self.graph.ndata[key])
-
-        for key in self.graph.edata.keys():
-            result_graph.edata[key] = torch.randn_like(self.graph.edata[key])
-
-        return FGGraph(result_graph)
+        return self._apply_unary_op(torch.randn_like)
 
     def ones_like(self) -> "FGGraph":
         """Generate ones with the same shape and type as self."""
-        result_graph = dgl.graph(self.graph.edges(), num_nodes=self.graph.num_nodes())
-
-        for key in self.graph.ndata.keys():
-            result_graph.ndata[key] = torch.ones_like(self.graph.ndata[key])
-
-        for key in self.graph.edata.keys():
-            result_graph.edata[key] = torch.ones_like(self.graph.edata[key])
-
-        return FGGraph(result_graph)
+        return self._apply_unary_op(torch.ones_like)
 
     def zeros_like(self) -> "FGGraph":
         """Generate zeros with the same shape and type as self."""
-        result_graph = dgl.graph(self.graph.edges(), num_nodes=self.graph.num_nodes())
-
-        for key in self.graph.ndata.keys():
-            result_graph.ndata[key] = torch.zeros_like(self.graph.ndata[key])
-
-        for key in self.graph.edata.keys():
-            result_graph.edata[key] = torch.zeros_like(self.graph.edata[key])
-
-        return FGGraph(result_graph)
+        return self._apply_unary_op(torch.zeros_like)
 
     def batch_sum(self) -> torch.Tensor:
         """Sum over all dimensions except the first (batch) dimension.
@@ -165,4 +172,13 @@ class FGGraph:
         -------
         sum : torch.Tensor, shape (batch_size,)
         """
-        raise NotImplementedError
+        summed = torch.zeros(self.graph.batch_size, device=self.graph.device)
+        for _, val in self.graph.ndata.items():
+            if isinstance(val, torch.Tensor):
+                summed += scatter(val, self.n_idx, dim=0, reduce="sum").sum(dim=-1)
+
+        for _, val in self.graph.edata.items():
+            if isinstance(val, torch.Tensor):
+                summed += scatter(val, self.e_idx, dim=0, reduce="sum").sum(dim=-1)
+
+        return summed

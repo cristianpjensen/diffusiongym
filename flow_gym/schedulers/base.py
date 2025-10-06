@@ -1,7 +1,7 @@
 """Base classes for schedulers of flow matching models."""
 
 from abc import ABC, abstractmethod
-from typing import Generic, Optional
+from typing import Generic
 
 import torch
 
@@ -24,15 +24,12 @@ class Scheduler(ABC, Generic[DataType]):
     :math:`\sigma`), however this can also be re-defined.
     """
 
-    def __init__(self, noise_schedule: Optional[NoiseSchedule[DataType]] = None):
-        if noise_schedule is None:
-            noise_schedule = MemorylessNoiseSchedule(self)
-
-        self._noise_schedule = noise_schedule
-
     @property
     def noise_schedule(self) -> NoiseSchedule[DataType]:
         """Get the current noise schedule."""
+        if not hasattr(self, "_noise_schedule"):
+            self._noise_schedule: NoiseSchedule[DataType] = MemorylessNoiseSchedule(self)
+
         return self._noise_schedule
 
     @noise_schedule.setter

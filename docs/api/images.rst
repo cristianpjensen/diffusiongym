@@ -1,5 +1,5 @@
 Images (optional)
-===========
+==================
 
 .. currentmodule:: flow_gym.images
 

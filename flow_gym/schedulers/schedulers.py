@@ -28,6 +28,29 @@ class OptimalTransportScheduler(Scheduler[FGTensor]):
         return FGTensor(append_dims(torch.ones_like(t), x.ndim))
 
 
+class CosineScheduler(Scheduler[FGTensor]):
+    """Cosine scheduler."""
+
+    def __init__(self, nu: float):
+        self.nu = nu
+
+    def alpha(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
+        r""":math:`\alpha_t`."""
+        out = 1 - torch.cos((t**self.nu) * torch.pi / 2).square()
+        return FGTensor(append_dims(out, x.ndim))
+
+    def alpha_dot(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
+        r""":math:`\dot{\alpha}_t`."""
+        out = (
+            self.nu
+            * torch.pi
+            * (t ** (self.nu - 1))
+            * torch.sin((t**self.nu) * torch.pi / 2)
+            * torch.cos((t**self.nu) * torch.pi / 2)
+        )
+        return FGTensor(append_dims(out, x.ndim))
+
+
 class DiffusionScheduler(Scheduler[FGTensor]):
     """Scheduler for discrete-time diffusion models based on a given noise schedule.
 

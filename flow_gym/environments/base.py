@@ -5,7 +5,7 @@ from itertools import pairwise
 from typing import Any, Generic, Iterable, Optional, Protocol
 
 import torch
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 from flow_gym.base_models import BaseModel
 from flow_gym.rewards import Reward
@@ -175,7 +175,8 @@ class BaseEnvironment(ABC, Generic[DataType]):
 
         running_costs = torch.zeros(self.discretization_steps, n)
 
-        t = torch.linspace(0, 1, self.discretization_steps + 1)
+        # Start at a very small number, instead of 0, to avoid singularities
+        t = torch.linspace(1 / self.discretization_steps, 1, self.discretization_steps + 1)
         iterator: Iterable[tuple[int, tuple[Any, Any]]] = enumerate(pairwise(t))
         if pbar:
             iterator = tqdm(iterator, total=self.discretization_steps)
@@ -188,6 +189,7 @@ class BaseEnvironment(ABC, Generic[DataType]):
             drift, running_cost = self.drift(x, t_curr, **kwargs)
             diffusion = self.diffusion(x, t_curr)
             x += dt * drift + torch.sqrt(dt) * diffusion * x.randn_like()
+            x = self.base_model.update_intermediate_state(x, t_curr)
 
             running_costs[i] = running_cost
             trajectories.append(x)

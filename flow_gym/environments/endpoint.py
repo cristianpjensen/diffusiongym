@@ -1,4 +1,4 @@
-r"""Environment with tensor samples and base model predict startpoint :math:`\epsilon(x, t)`."""
+r"""Environment with tensor samples and base model predicts the endpoint :math:`x_1(x, t)`."""
 
 from typing import Any
 
@@ -9,8 +9,8 @@ from flow_gym.types import DataType
 from .base import BaseEnvironment
 
 
-class EpsilonEnvironment(BaseEnvironment[DataType]):
-    r"""Environment with tensor samples and base model predicts startpoint :math:`\epsilon(x, t)`.
+class EndpointEnvironment(BaseEnvironment[DataType]):
+    r"""Environment with tensor samples and base model predicts the endpoint :math:`x_1(x, t)`.
 
     Parameters
     ----------
@@ -52,15 +52,18 @@ class EpsilonEnvironment(BaseEnvironment[DataType]):
         running_cost : torch.Tensor, shape (n,)
             Running cost :math:`L(x_t, t)` of the policy for the given (state, timestep)-pair.
         """
+        alpha = self.scheduler.alpha(x, t)
         beta = self.scheduler.beta(x, t)
         kappa = self.scheduler.kappa(x, t)
         eta = self.scheduler.eta(x, t)
         sigma = self.scheduler.sigma(x, t)
+        sigma_eta = 0.5 * sigma * sigma + eta
 
         action = self.policy(x, t, **kwargs)
 
-        a = kappa
-        b = -(0.5 * sigma * sigma + eta) / beta
+        a = kappa - sigma_eta / (beta * beta)
+        b = sigma_eta * alpha / (beta * beta)
+
         drift = a * x + b * action
 
         control = x.zeros_like()

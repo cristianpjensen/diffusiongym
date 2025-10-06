@@ -1,10 +1,16 @@
 """flow_gym package."""
 
 from flow_gym.base_models import BaseModel
-from flow_gym.environments import BaseEnvironment, EpsilonEnvironment, ScoreEnvironment
+from flow_gym.environments import (
+    BaseEnvironment,
+    EndpointEnvironment,
+    EpsilonEnvironment,
+    ScoreEnvironment,
+)
 from flow_gym.rewards import DifferentiableReward, Reward
 from flow_gym.schedulers import (
     ConstantNoiseSchedule,
+    CosineScheduler,
     DiffusionScheduler,
     MemorylessNoiseSchedule,
     NoiseSchedule,
@@ -17,10 +23,12 @@ __all__ = [
     "BaseEnvironment",
     "BaseModel",
     "ConstantNoiseSchedule",
+    "CosineScheduler",
     "DataProtocol",
     "DataType",
     "DifferentiableReward",
     "DiffusionScheduler",
+    "EndpointEnvironment",
     "EpsilonEnvironment",
     "FGTensor",
     "MemorylessNoiseSchedule",
