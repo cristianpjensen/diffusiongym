@@ -189,7 +189,6 @@ class BaseEnvironment(ABC, Generic[DataType]):
             drift, running_cost = self.drift(x, t_curr, **kwargs)
             diffusion = self.diffusion(x, t_curr)
             x += dt * drift + torch.sqrt(dt) * diffusion * x.randn_like()
-            x = self.base_model.update_intermediate_state(x, t_curr)
 
             running_costs[i] = running_cost
             trajectories.append(x)
