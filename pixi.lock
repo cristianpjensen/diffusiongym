@@ -1325,7 +1325,7 @@ packages:
 - pypi: ./
   name: flow-gym
   version: 0.0.1
-  sha256: db10aa23606e4721ae284c89e9323702c7b7f8bbe697c9ce6bba1be9e0c05c2b
+  sha256: b94157fff1bf60e571dc362cdd05fb07a85c40ffef9c244646095f5050bce81a
   requires_python: '>=3.8,<3.12'
   editable: true
 - pypi: git+https://github.com/cristianpjensen/FlowMol.git?rev=5b56ffb285887bdf0bfaab5a2ec76e74d851ee03#5b56ffb285887bdf0bfaab5a2ec76e74d851ee03

@@ -175,7 +175,7 @@ class BaseEnvironment(ABC, Generic[DataType]):
         """
         x = self.base_model.sample_p0(n)
         x, kwargs = self.base_model.preprocess(x, **kwargs)
-        trajectories = [x]
+        trajectories = [x.to_cpu()]
 
         running_costs = torch.zeros(self.discretization_steps, n)
 
@@ -195,7 +195,7 @@ class BaseEnvironment(ABC, Generic[DataType]):
             x += dt * drift + torch.sqrt(dt) * diffusion * x.randn_like()
 
             running_costs[i] = running_cost
-            trajectories.append(x)
+            trajectories.append(x.to_cpu())
 
         x = self.base_model.postprocess(x)
         rewards = self.reward(x).cpu()

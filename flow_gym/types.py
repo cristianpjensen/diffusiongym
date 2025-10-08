@@ -44,6 +44,15 @@ class DataProtocol(Protocol):
         """
         ...
 
+    def to_cpu(self) -> Self:
+        """Make a copy of the data and move it to CPU.
+
+        Returns
+        -------
+        A copy of self on CPU.
+        """
+        ...
+
 
 DataType = TypeVar("DataType", bound=DataProtocol)
 
@@ -116,3 +125,7 @@ class FGTensor(torch.Tensor):
     def zeros_like(self) -> "FGTensor":
         """Generate zeros with the same shape and type as self."""
         return self._wrap_result(torch.zeros_like(self))
+
+    def to_cpu(self) -> "FGTensor":
+        """Make a copy of the data and move it to CPU."""
+        return self._wrap_result(self.clone().cpu())

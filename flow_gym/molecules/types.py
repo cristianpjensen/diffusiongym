@@ -182,3 +182,13 @@ class FGGraph:
                 summed += scatter(val, self.e_idx, dim=0, reduce="sum").sum(dim=-1)
 
         return summed
+
+    def to_cpu(self) -> "FGGraph":
+        """Move the graph to CPU.
+
+        Returns
+        -------
+        output : FGGraph
+            A copy of self on CPU.
+        """
+        return FGGraph(self.graph.to("cpu"), self.ue_mask.cpu(), self.n_idx.cpu(), self.e_idx.cpu())
