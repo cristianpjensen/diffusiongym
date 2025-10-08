@@ -8,9 +8,11 @@ from numpy.typing import NDArray
 from rdkit import Chem
 
 from flow_gym.molecules.rewards.base import MoleculeReward
+from flow_gym.registry import reward_registry
 from flow_gym.utils import temporary_workdir
 
 
+@reward_registry.register("molecules/dipole_moment")
 class DipoleMomentReward(MoleculeReward):
     """Dipole moment reward for molecules. Requires xtb to be installed."""
 

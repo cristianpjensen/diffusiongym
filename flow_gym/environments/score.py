@@ -28,7 +28,7 @@ class ScoreEnvironment(BaseEnvironment[DataType]):
         self,
         x: DataType,
         t: torch.Tensor,
-        **kwargs: dict[str, Any],
+        **kwargs: Any,
     ) -> tuple[DataType, torch.Tensor]:
         """Compute the drift term of the environment's dynamics.
 
@@ -40,7 +40,7 @@ class ScoreEnvironment(BaseEnvironment[DataType]):
         t : torch.Tensor, shape (n,)
             The current time step in [0, 1].
 
-        **kwargs : dict[str, Any]
+        **kwargs : dict
             Additional keyword arguments to pass to the base model (e.g. text embedding or class
             label).
 

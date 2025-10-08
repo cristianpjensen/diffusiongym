@@ -4,6 +4,7 @@ import torch
 import torchvision
 
 from flow_gym import FGTensor, Reward
+from flow_gym.registry import reward_registry
 
 
 def _bits_per_pixel(imgs: torch.Tensor, quality_level: int) -> torch.Tensor:
@@ -22,6 +23,7 @@ def _bits_per_pixel(imgs: torch.Tensor, quality_level: int) -> torch.Tensor:
     return bpp.to(imgs.device)
 
 
+@reward_registry.register("images/incompression")
 class IncompressionReward(Reward[FGTensor]):
     """Incompression reward for image models.
 
@@ -42,7 +44,7 @@ class IncompressionReward(Reward[FGTensor]):
     torch.Size([8])
     """
 
-    def __init__(self, quality_level: int):
+    def __init__(self, quality_level: int = 85):
         self.quality_level = quality_level
 
     def __call__(self, imgs: FGTensor) -> torch.Tensor:
@@ -61,6 +63,7 @@ class IncompressionReward(Reward[FGTensor]):
         return _bits_per_pixel(torch.Tensor(imgs), self.quality_level)
 
 
+@reward_registry.register("images/compression")
 class CompressionReward(Reward[FGTensor]):
     """Compression reward for image models.
 
@@ -81,7 +84,7 @@ class CompressionReward(Reward[FGTensor]):
     torch.Size([8])
     """
 
-    def __init__(self, quality_level: int):
+    def __init__(self, quality_level: int = 85):
         self.quality_level = quality_level
 
     def __call__(self, imgs: FGTensor) -> torch.Tensor:

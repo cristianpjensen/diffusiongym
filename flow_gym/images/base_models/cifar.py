@@ -6,11 +6,13 @@ import torch
 from diffusers.pipelines.ddpm.pipeline_ddpm import DDPMPipeline
 
 from flow_gym import BaseModel, DiffusionScheduler, FGTensor
+from flow_gym.registry import base_model_registry
 
 if TYPE_CHECKING:
     from diffusers.models.unets.unet_2d import UNet2DModel
 
 
+@base_model_registry.register("images/cifar")
 class CIFARBaseModel(BaseModel[FGTensor]):
     """Pre-trained diffusion model on CIFAR-10 32x32.
 
@@ -27,6 +29,8 @@ class CIFARBaseModel(BaseModel[FGTensor]):
     env.policy = policy
     ```
     """
+
+    output_type = "epsilon"
 
     def __init__(self, device: Optional[torch.device]):
         super().__init__(device)
@@ -52,7 +56,7 @@ class CIFARBaseModel(BaseModel[FGTensor]):
 
         Returns
         -------
-        samples : torch.Tensor, shape (n, 3, 32, 32)
+        samples : FGTensor, shape (n, 3, 32, 32)
             Samples from the base distribution :math:`p_0`.
 
         Notes
@@ -61,12 +65,12 @@ class CIFARBaseModel(BaseModel[FGTensor]):
         """
         return FGTensor(torch.randn(n, 3, 32, 32, device=self.device))
 
-    def forward(self, x: FGTensor, t: torch.Tensor, **kwargs: dict[str, Any]) -> FGTensor:
+    def forward(self, x: FGTensor, t: torch.Tensor, **kwargs: Any) -> FGTensor:
         r"""Forward pass of the model, outputting :math:`\epsilon(x_t, t)`.
 
         Parameters
         ----------
-        x : torch.Tensor, shape (n, 3, 32, 32)
+        x : FGTensor, shape (n, 3, 32, 32)
             Input data.
         t : torch.Tensor, shape (n,)
             Time steps, values in [0, 1].
@@ -75,7 +79,7 @@ class CIFARBaseModel(BaseModel[FGTensor]):
 
         Returns
         -------
-        output : torch.Tensor, shape (n, 3, 32, 32)
+        output : FGTensor, shape (n, 3, 32, 32)
             Output of the model.
         """
         k = self.scheduler.model_input(t)

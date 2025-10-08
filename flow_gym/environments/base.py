@@ -16,7 +16,7 @@ from flow_gym.types import DataType
 class Policy(Protocol[DataType]):
     """General protocol for a policy function."""
 
-    def __call__(self, x: DataType, t: torch.Tensor, **kwargs: dict[str, Any]) -> DataType: ...  # noqa: D102
+    def __call__(self, x: DataType, t: torch.Tensor, **kwargs: Any) -> DataType: ...  # noqa: D102
 
 
 class BaseEnvironment(ABC, Generic[DataType]):
@@ -86,7 +86,10 @@ class BaseEnvironment(ABC, Generic[DataType]):
 
     @abstractmethod
     def drift(
-        self, x: DataType, t: torch.Tensor, **kwargs: dict[str, Any]
+        self,
+        x: DataType,
+        t: torch.Tensor,
+        **kwargs: Any,
     ) -> tuple[DataType, torch.Tensor]:
         """Compute the drift term of the environment's dynamics.
 
@@ -98,7 +101,7 @@ class BaseEnvironment(ABC, Generic[DataType]):
         t : torch.Tensor, shape (n,)
             The current time step in [0, 1].
 
-        **kwargs : dict[str, Any]
+        **kwargs : dict
             Keyword arguments to the model.
 
         Returns
@@ -133,7 +136,7 @@ class BaseEnvironment(ABC, Generic[DataType]):
         self,
         n: int,
         pbar: bool = True,
-        **kwargs: dict[str, Any],
+        **kwargs: Any,
     ) -> tuple[DataType, list[DataType], torch.Tensor, torch.Tensor, torch.Tensor, dict[str, Any]]:
         r"""Sample n trajectories from the environment.
 
@@ -145,7 +148,7 @@ class BaseEnvironment(ABC, Generic[DataType]):
         pbar : bool, default: True
             Whether to display a progress bar.
 
-        **kwargs : dict[str, Any]
+        **kwargs : dict
             Additional keyword arguments to pass to the base model at every timestep (e.g. text
             embedding or class label).
 
@@ -171,6 +174,7 @@ class BaseEnvironment(ABC, Generic[DataType]):
             Additional keyword arguments passed to the base model at every timestep.
         """
         x = self.base_model.sample_p0(n)
+        x, kwargs = self.base_model.preprocess(x, **kwargs)
         trajectories = [x]
 
         running_costs = torch.zeros(self.discretization_steps, n)

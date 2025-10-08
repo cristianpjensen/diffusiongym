@@ -9,10 +9,14 @@ from flowmol.data_processing.utils import build_edge_idxs, get_batch_idxs, get_u
 
 from flow_gym import BaseModel, ConstantNoiseSchedule, CosineScheduler, FGTensor, Scheduler
 from flow_gym.molecules.types import FGGraph
+from flow_gym.registry import base_model_registry
 
 
+@base_model_registry.register("molecules/flowmol")
 class FlowMolBaseModel(BaseModel[FGGraph]):
     """Pre-trained continuous flow matching model on GEOM-Drugs."""
+
+    output_type = "endpoint"
 
     def __init__(self, device: torch.device):
         super().__init__(device)
@@ -88,7 +92,7 @@ class FlowMolBaseModel(BaseModel[FGGraph]):
         g.edata["ue_mask"] = x.ue_mask
         return FGGraph(g, x.ue_mask, x.n_idx, x.e_idx)
 
-    def forward(self, x: FGGraph, t: torch.Tensor, **kwargs: dict[str, Any]) -> FGGraph:
+    def forward(self, x: FGGraph, t: torch.Tensor, **kwargs: Any) -> FGGraph:
         r"""Compute the endpoint vector field :math:`\hat{x_1}(x, t)`."""
         output = self.model.vector_field(
             x.graph, t, x.n_idx, x.ue_mask, apply_softmax=True, remove_com=True, **kwargs

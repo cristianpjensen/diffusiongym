@@ -6,7 +6,10 @@ from flow_gym.environments import (
     EndpointEnvironment,
     EpsilonEnvironment,
     ScoreEnvironment,
+    VelocityEnvironment,
 )
+from flow_gym.make import make
+from flow_gym.registry import base_model_registry, reward_registry
 from flow_gym.rewards import DifferentiableReward, Reward
 from flow_gym.schedulers import (
     ConstantNoiseSchedule,
@@ -37,6 +40,10 @@ __all__ = [
     "Reward",
     "Scheduler",
     "ScoreEnvironment",
+    "VelocityEnvironment",
+    "base_model_registry",
+    "make",
+    "reward_registry",
 ]
 
 try:
