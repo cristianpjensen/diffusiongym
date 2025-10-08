@@ -71,8 +71,6 @@ class EpsilonEnvironment(BaseEnvironment[DataType]):
         if self.control_policy is not None:
             control_add = self.control_policy(x, t, **kwargs)
             drift += sigma * control_add
-            # TODO: Implement this as if the control would be the score, so it needs some constant
-            # multiplication
             control += control_add
 
         return a * x + b * action, 0.5 * (control * control).batch_sum()
