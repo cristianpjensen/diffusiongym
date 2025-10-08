@@ -2,9 +2,6 @@
 
 from typing import Any, Callable, Generic, List, TypeVar, overload
 
-from flow_gym.base_models.base import BaseModel
-from flow_gym.rewards.base import Reward
-
 T = TypeVar("T")
 
 
@@ -180,5 +177,5 @@ class Registry(Generic[T]):
 
 
 # Global registries
-base_model_registry: Registry[BaseModel[Any]] = Registry("BASE_MODEL_REGISTRY")
-reward_registry: Registry[Reward[Any]] = Registry("REWARD_REGISTRY")
+base_model_registry = Registry("BASE_MODEL_REGISTRY")  # type: ignore
+reward_registry = Registry("REWARD_REGISTRY")  # type: ignore
