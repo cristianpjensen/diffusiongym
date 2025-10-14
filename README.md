@@ -1,9 +1,7 @@
 # Flow Gym
 
 <div align="center">
-  <img src="docs/_static/toy_ode.gif" width="30%" />
-  <img src="docs/_static/toy_sde.gif" width="30%" />
-  <img src="docs/_static/sd2.gif" width="30%" />
+  <img src="docs/_static/teaser.gif" width="100%" />
 </div>
 
 <p align="center">

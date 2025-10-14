@@ -9,4 +9,3 @@ Rewards
     :nosignatures:
 
     Reward
-    DifferentiableReward
