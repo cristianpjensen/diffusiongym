@@ -19,13 +19,19 @@ class OptimalTransportScheduler(Scheduler[FGTensor]):
         \alpha_t = t, \quad \beta_t = 1 - t, \quad \dot{\alpha}_t = 1, \quad \dot{\beta}_t = -1.
     """
 
+    def _alpha(self, t: torch.Tensor) -> torch.Tensor:
+        return t.unsqueeze(-1)
+
     def alpha(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
         r""":math:`\alpha_t = t`."""
-        return FGTensor(append_dims(t, x.ndim))
+        return FGTensor(append_dims(self._alpha(t), x.ndim))
+
+    def _alpha_dot(self, t: torch.Tensor) -> torch.Tensor:
+        return torch.ones_like(t).unsqueeze(-1)
 
     def alpha_dot(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
         r""":math:`\dot{\alpha}_t = 1`."""
-        return FGTensor(append_dims(torch.ones_like(t), x.ndim))
+        return FGTensor(append_dims(self._alpha_dot(t), x.ndim))
 
 
 class CosineScheduler(Scheduler[FGTensor]):
@@ -34,21 +40,27 @@ class CosineScheduler(Scheduler[FGTensor]):
     def __init__(self, nu: float):
         self.nu = nu
 
+    def _alpha(self, t: torch.Tensor) -> torch.Tensor:
+        result: torch.Tensor = 1 - torch.cos((t**self.nu) * torch.pi / 2).square()
+        return result
+
     def alpha(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
         r""":math:`\alpha_t`."""
-        out = 1 - torch.cos((t**self.nu) * torch.pi / 2).square()
-        return FGTensor(append_dims(out, x.ndim))
+        return FGTensor(append_dims(self._alpha(t), x.ndim))
 
-    def alpha_dot(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
-        r""":math:`\dot{\alpha}_t`."""
-        out = (
+    def _alpha_dot(self, t: torch.Tensor) -> torch.Tensor:
+        result: torch.Tensor = (
             self.nu
             * torch.pi
             * (t ** (self.nu - 1))
             * torch.sin((t**self.nu) * torch.pi / 2)
             * torch.cos((t**self.nu) * torch.pi / 2)
         )
-        return FGTensor(append_dims(out, x.ndim))
+        return result
+
+    def alpha_dot(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
+        r""":math:`\dot{\alpha}_t`."""
+        return FGTensor(append_dims(self._alpha_dot(t), x.ndim))
 
 
 class DiffusionScheduler(Scheduler[FGTensor]):
@@ -79,22 +91,34 @@ class DiffusionScheduler(Scheduler[FGTensor]):
         """Input to the model at time t that encodes the timestep."""
         return self._get_index(t).to(t.device)
 
+    def _alpha(self, t: torch.Tensor) -> torch.Tensor:
+        k = self._get_index(t)
+        return torch.sqrt(self.alpha_bar[k]).unsqueeze(-1)
+
     def alpha(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
         r""":math:`\alpha_t`."""
+        return FGTensor(append_dims(self._alpha(t), x.ndim))
+
+    def _beta(self, t: torch.Tensor) -> torch.Tensor:
         k = self._get_index(t)
-        return FGTensor(append_dims(torch.sqrt(self.alpha_bar[k]), x.ndim))
+        return torch.sqrt(1 - self.alpha_bar[k]).unsqueeze(-1)
 
     def beta(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
         r""":math:`\beta_t`."""
+        return FGTensor(append_dims(self._beta(t), x.ndim))
+
+    def _alpha_dot(self, t: torch.Tensor) -> torch.Tensor:
         k = self._get_index(t)
-        return FGTensor(append_dims(torch.sqrt(1 - self.alpha_bar[k]), x.ndim))
+        return 0.5 * self.alpha_bar_dot[k] / self._alpha(t)
 
     def alpha_dot(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
         r""":math:`\dot{\alpha}_t`."""
+        return FGTensor(append_dims(self._alpha_dot(t), x.ndim))
+
+    def _beta_dot(self, t: torch.Tensor) -> torch.Tensor:
         k = self._get_index(t)
-        return FGTensor(0.5 * append_dims(self.alpha_bar_dot[k], x.ndim) / self.alpha(x, t))
+        return -0.5 * self.alpha_bar_dot[k] / self._beta(t)
 
     def beta_dot(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
         r""":math:`\dot{\beta}_t`."""
-        k = self._get_index(t)
-        return FGTensor(-0.5 * append_dims(self.alpha_bar_dot[k], x.ndim) / self.beta(x, t))
+        return FGTensor(append_dims(self._beta_dot(t), x.ndim))

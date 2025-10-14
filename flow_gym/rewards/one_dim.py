@@ -1,5 +1,6 @@
 """Binary reward for one-dimensional toy environments."""
 
+import numpy as np
 import torch
 
 from flow_gym.registry import reward_registry
@@ -15,3 +16,16 @@ class BinaryReward(Reward[FGTensor]):
     def __call__(self, x: FGTensor) -> torch.Tensor:
         """Evaluate the reward function at the given points."""
         return ((x >= 0) & (x <= 1)).to(torch.float32).squeeze(-1)
+
+
+@reward_registry.register("1d/gaussian")
+class GaussianReward(Reward[FGTensor]):
+    """Gaussian reward for one-dimensional toy environments."""
+
+    def __call__(self, x: FGTensor) -> torch.Tensor:
+        """Evaluate the reward function at the given points."""
+        mu = -2.5
+        sigma = 0.8
+        pdf = torch.exp(-0.5 * torch.square((x - mu) / sigma)) / (sigma * np.sqrt(2 * np.pi))
+        result: torch.Tensor = pdf.to(torch.float32).squeeze()
+        return result

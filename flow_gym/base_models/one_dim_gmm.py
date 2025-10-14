@@ -1,5 +1,6 @@
 """Base model for 1D Gaussian mixture model (GMM)."""
 
+import math
 from typing import Any, Optional, cast
 
 import torch
@@ -11,6 +12,7 @@ from tqdm.auto import trange
 from flow_gym.registry import base_model_registry
 from flow_gym.schedulers import OptimalTransportScheduler, Scheduler
 from flow_gym.types import FGTensor
+from flow_gym.utils import append_dims
 
 from .base import BaseModel
 
@@ -81,31 +83,39 @@ class OneDimensionalBaseModel(BaseModel[FGTensor]):
 
 
 class MLP(nn.Module):
-    """Multi-layer perceptron (MLP) with 1 layer that appends time as an additional input.
+    """Multi-layer perceptron."""
 
-    Parameters
-    ----------
-    input_dim : int
-        Input dimension.
-
-    hidden_dim : int
-        Hidden dimension.
-
-    output_dim : int
-        Output dimension.
-    """
-
-    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int):
+    def __init__(
+        self,
+        in_dim: int,
+        out_dim: int,
+        time_dim: int = 128,
+        cond_dim: int = 256,
+        depth: int = 3,
+        width: int = 256,
+        window_size: float = 1000.0,
+        t_mult: float = 1000.0,
+    ) -> None:
         super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(input_dim + 1, hidden_dim),
-            nn.SiLU(),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.SiLU(),
-            nn.Linear(hidden_dim, output_dim),
-        )
 
-    def forward(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+        self.time_embed = SinusoidalTimeEmbedding(time_dim, cond_dim, window_size, t_mult)
+
+        blocks = [Block(in_dim, width, cond_dim)]
+        for _ in range(depth - 1):
+            blocks.append(Block(width, width, cond_dim))
+
+        self.blocks = nn.ModuleList(blocks)
+        self.head = nn.Linear(width, out_dim, bias=True)
+
+        nn.init.zeros_(self.head.weight)
+        nn.init.zeros_(self.head.bias)
+
+    def forward(
+        self,
+        x: FGTensor,
+        t: torch.Tensor,
+        **kwargs: Any,
+    ) -> FGTensor:
         """Forward pass of the MLP.
 
         Parameters
@@ -121,10 +131,72 @@ class MLP(nn.Module):
         output : torch.Tensor, shape (n, output_dim)
             Output of the MLP.
         """
-        t = t.unsqueeze(-1)
-        x_and_t = torch.cat([x, t], dim=-1)
-        out = cast("torch.Tensor", self.net(x_and_t))
-        return out
+        cond = self.time_embed(t)
+
+        x_ = x.flatten(start_dim=t.ndim)
+        for block in self.blocks:
+            x_ = block(x_, cond)
+
+        return FGTensor(self.head(x_).reshape(*x.shape[:-1], -1))
+
+
+class Block(nn.Module):
+    """A single block of the MLP."""
+
+    def __init__(self, in_dim: int, out_dim: int, cond_dim: int):
+        super().__init__()
+        self.linear = nn.Linear(in_dim, out_dim)
+        self.norm = nn.LayerNorm(out_dim)
+        self.film = FiLM(out_dim, cond_dim)
+
+    def forward(self, x: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
+        """Forward pass of the block."""
+        return F.silu(self.film(self.norm(self.linear(x)), cond))
+
+
+class SinusoidalTimeEmbedding(nn.Module):
+    """t -> R^d sinusoidal embedding + MLP."""
+
+    def __init__(
+        self,
+        dim: int = 128,
+        hidden_dim: int = 256,
+        window_size: float = 1000.0,
+        t_mult: float = 1000.0,
+    ) -> None:
+        super().__init__()
+        self.mlp = nn.Sequential(
+            nn.Linear(dim, hidden_dim), nn.SiLU(), nn.Linear(hidden_dim, hidden_dim)
+        )
+
+        self.t_mult = t_mult
+        half = dim // 2
+        freqs = torch.exp(-math.log(window_size) * torch.arange(half, dtype=torch.float32) / half)
+        self.register_buffer("freqs", freqs)
+
+    def forward(self, t: torch.Tensor) -> torch.Tensor:
+        """Compute sinusoidal time embedding."""
+        # Assuming t is in [0, 1], scale to [0, t_mult] as is usual for diffusion models
+        t = t.float() * self.t_mult
+        args = t.unsqueeze(-1) * self.freqs.unsqueeze(-2)
+        emb = torch.cat([torch.sin(args), torch.cos(args)], dim=-1)
+        result: torch.Tensor = self.mlp(emb)
+        return result
+
+
+class FiLM(nn.Module):
+    """Feature-wise linear modulation h -> gamma(t) * h + beta(t)."""
+
+    def __init__(self, n_channels: int, cond_dim: int):
+        super().__init__()
+        self.to_scale_shift = nn.Linear(cond_dim, 2 * n_channels)
+
+    def forward(self, x: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
+        """Apply FiLM modulation."""
+        gamma, beta = self.to_scale_shift(cond).chunk(2, dim=-1)
+        gamma = append_dims(gamma, x.ndim)
+        beta = append_dims(beta, x.ndim)
+        return x * (1 + gamma) + beta
 
 
 def train_1d_gaussian(scheduler: Scheduler[FGTensor], device: torch.device) -> nn.Module:
@@ -150,11 +222,11 @@ def train_1d_gaussian(scheduler: Scheduler[FGTensor], device: torch.device) -> n
         dist.Normal(torch.Tensor([0.0, 3.0]), torch.Tensor([1.0, 0.4])),  # type: ignore
     )
 
-    mlp = MLP(1, 64, 1).to(device)
+    mlp = MLP(1, 1).to(device)
     opt = torch.optim.Adam(mlp.parameters(), lr=1e-3)
 
     mlp.train()
-    for _ in trange(10_000, desc="training 1d gmm model"):
+    for _ in trange(1_000, desc="training 1d gmm model"):
         x1 = FGTensor(p1.sample((4096, 1)).to(device))  # type: ignore
         x0 = x1.randn_like()
         t = torch.rand(x1.shape[0], device=device)

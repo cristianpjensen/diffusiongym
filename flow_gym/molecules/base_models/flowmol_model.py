@@ -1,13 +1,13 @@
 """Pre-trained continuous FlowMol model, trained on GEOM-Drugs."""
 
-from typing import Any, cast
+from typing import Any
 
 import dgl
 import flowmol
 import torch
 from flowmol.data_processing.utils import build_edge_idxs, get_batch_idxs, get_upper_edge_mask
 
-from flow_gym import BaseModel, ConstantNoiseSchedule, CosineScheduler, FGTensor, Scheduler
+from flow_gym import BaseModel, ConstantNoiseSchedule, CosineScheduler, Scheduler
 from flow_gym.molecules.types import FGGraph
 from flow_gym.registry import base_model_registry
 
@@ -124,39 +124,54 @@ class GEOMScheduler(Scheduler[FGGraph]):
             "c_t": CosineScheduler(2.0),
             "e_t": CosineScheduler(2.0),
         }
+        self.scheduler_order = ["x_t", "a_t", "c_t", "e_t"]
+
+    def _alpha(self, t: torch.Tensor) -> torch.Tensor:
+        out = torch.zeros(t.shape[0], len(self.schedulers), device=t.device, dtype=t.dtype)
+        for idx, key in enumerate(self.scheduler_order):
+            out[:, idx] = self.schedulers[key]._alpha(t).squeeze(-1)
+
+        return out
 
     def alpha(self, x: FGGraph, t: torch.Tensor) -> FGGraph:
         r""":math:`\alpha_t`."""
         g = x.graph
         res = x._get_empty_graph()
 
-        for key in self.schedulers:
+        alphas = self._alpha(t)
+
+        for idx, key in enumerate(self.scheduler_order):
             if key in g.ndata:
-                data = cast("torch.Tensor", g.ndata[key])
-                t_alpha = self.schedulers[key].alpha(FGTensor(data), t)
+                t_alpha = alphas[:, idx].unsqueeze(-1)
                 res.ndata[key] = t_alpha[x.n_idx]
             elif key in g.edata:
-                data = cast("torch.Tensor", g.edata[key])
-                t_alpha = self.schedulers[key].alpha(FGTensor(data), t)
+                t_alpha = alphas[:, idx].unsqueeze(-1)
                 res.edata[key] = t_alpha[x.e_idx]
             else:
                 raise ValueError(f"Key {key} not found in graph data.")
 
         return FGGraph(res, x.ue_mask, x.n_idx, x.e_idx)
 
+    def _alpha_dot(self, t: torch.Tensor) -> torch.Tensor:
+        out = torch.zeros(t.shape[0], len(self.schedulers), device=t.device, dtype=t.dtype)
+        for idx, key in enumerate(self.scheduler_order):
+            out[:, idx] = self.schedulers[key]._alpha_dot(t).squeeze(-1)
+
+        return out
+
     def alpha_dot(self, x: FGGraph, t: torch.Tensor) -> FGGraph:
         r""":math:`\dot{\alpha}_t`."""
         g = x.graph
         res = x._get_empty_graph()
 
-        for key in self.schedulers:
+        alpha_dots = self._alpha_dot(t)
+
+        for idx, key in enumerate(self.scheduler_order):
             if key in g.ndata:
-                data = cast("torch.Tensor", g.ndata[key])
-                t_alpha_dot = self.schedulers[key].alpha_dot(FGTensor(data), t)
+                t_alpha_dot = alpha_dots[:, idx].unsqueeze(-1)
                 res.ndata[key] = t_alpha_dot[x.n_idx]
             elif key in g.edata:
-                data = cast("torch.Tensor", g.edata[key])
-                t_alpha_dot = self.schedulers[key].alpha_dot(FGTensor(data), t)
+                t_alpha_dot = alpha_dots[:, idx].unsqueeze(-1)
                 res.edata[key] = t_alpha_dot[x.e_idx]
             else:
                 raise ValueError(f"Key {key} not found in graph data.")

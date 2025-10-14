@@ -55,21 +55,21 @@ class ScoreEnvironment(BaseEnvironment[DataType]):
         kappa = self.scheduler.kappa(x, t)
         eta = self.scheduler.eta(x, t)
         sigma = self.scheduler.sigma(x, t)
+        sigma_ft = self.memoryless_schedule(x, t)
 
         action = self.policy(x, t, **kwargs)
 
         a = kappa
         b = 0.5 * sigma * sigma + eta
-        drift = a * x + b * action
 
         control = x.zeros_like()
         if self.is_policy_set:
             action_base = self.base_model.forward(x, t, **kwargs)
-            control = (b / sigma) * (action - action_base)
+            control = (b / sigma_ft) * (action - action_base)
 
         if self.control_policy is not None:
             control_add = self.control_policy(x, t, **kwargs)
-            drift += sigma * control_add
             control += control_add
+            action += (sigma_ft / b) * control_add
 
         return a * x + b * action, 0.5 * (control * control).batch_sum()

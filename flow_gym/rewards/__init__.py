@@ -1,10 +1,10 @@
 """Reward module package for flow_gym."""
 
-from .base import DifferentiableReward, Reward
-from .one_dim_binary import BinaryReward
+from .base import Reward
+from .one_dim import BinaryReward, GaussianReward
 
 __all__ = [
     "BinaryReward",
-    "DifferentiableReward",
+    "GaussianReward",
     "Reward",
 ]

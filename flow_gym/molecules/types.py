@@ -183,12 +183,78 @@ class FGGraph:
 
         return summed
 
-    def to_cpu(self) -> "FGGraph":
-        """Move the graph to CPU.
+    def to_device(self, device: torch.device | str) -> "FGGraph":
+        """Move the graph to the specified device.
 
         Returns
         -------
         output : FGGraph
-            A copy of self on CPU.
+            A copy of self on the specified device.
         """
-        return FGGraph(self.graph.to("cpu"), self.ue_mask.cpu(), self.n_idx.cpu(), self.e_idx.cpu())
+        return FGGraph(
+            self.graph.to(device),
+            self.ue_mask.to(device),
+            self.n_idx.to(device),
+            self.e_idx.to(device),
+        )
+
+    def with_requires_grad(self) -> "FGGraph":
+        """Enable gradient tracking for all tensors in the graph.
+
+        Returns
+        -------
+        output : FGGraph
+            New graph with requires_grad=True for all tensors.
+        """
+        res = self._get_empty_graph()
+
+        for key, val in self.graph.ndata.items():
+            if isinstance(val, torch.Tensor):
+                res.ndata[key] = val.requires_grad_(True)
+            else:
+                res.ndata[key] = val
+
+        for key, val in self.graph.edata.items():
+            if isinstance(val, torch.Tensor):
+                res.edata[key] = val.requires_grad_(True)
+            else:
+                res.edata[key] = val
+
+        return FGGraph(res, self.ue_mask, self.n_idx, self.e_idx)
+
+    def gradient(self, x: torch.Tensor) -> "FGGraph":
+        """Compute gradients of x with respect to all tensors in the graph.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            The tensor to compute gradients from (typically a loss or output).
+
+        Returns
+        -------
+        output : FGGraph
+            New graph containing gradients of x with respect to each tensor.
+        """
+        res = self._get_empty_graph()
+
+        for n_feat, val in self.graph.ndata.items():
+            if isinstance(val, torch.Tensor):
+                grad = torch.autograd.grad(
+                    x, val, grad_outputs=torch.ones_like(x), retain_graph=True
+                )[0]
+                if grad is None:
+                    grad = torch.zeros_like(val)
+
+                res.ndata[n_feat] = grad
+
+        for e_feat, val in self.graph.edata.items():
+            if isinstance(val, torch.Tensor):
+                grad = torch.autograd.grad(
+                    x, val, grad_outputs=torch.ones_like(x), retain_graph=True
+                )[0]
+                if grad is None:
+                    grad = torch.zeros_like(val)
+
+                res.edata[e_feat] = grad
+
+        return FGGraph(res, self.ue_mask, self.n_idx, self.e_idx)

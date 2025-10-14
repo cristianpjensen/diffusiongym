@@ -10,7 +10,7 @@ from flow_gym.environments import (
 )
 from flow_gym.make import make
 from flow_gym.registry import base_model_registry, reward_registry
-from flow_gym.rewards import DifferentiableReward, Reward
+from flow_gym.rewards import Reward
 from flow_gym.schedulers import (
     ConstantNoiseSchedule,
     CosineScheduler,
@@ -29,7 +29,6 @@ __all__ = [
     "CosineScheduler",
     "DataProtocol",
     "DataType",
-    "DifferentiableReward",
     "DiffusionScheduler",
     "EndpointEnvironment",
     "EpsilonEnvironment",

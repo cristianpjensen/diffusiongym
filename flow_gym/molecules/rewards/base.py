@@ -18,6 +18,10 @@ class MoleculeReward(Reward[FGGraph]):
 
     Parameters
     ----------
+    atom_type_map : list[str], default=["C", "H", "N", "O", "F", "P", "S", "Cl", "Br", "I"]
+        List of atom types corresponding to the node features in the input graph. The index of each
+        atom type in the list corresponds to its integer representation in the node features.
+
     validate : bool, default=False
         Whether to validate molecules using RDKit's sanitization.
 
@@ -33,12 +37,15 @@ class MoleculeReward(Reward[FGGraph]):
 
     def __init__(
         self,
-        atom_type_map: list[str],
+        atom_type_map: Optional[list[str]] = None,
         validate: bool = False,
         check_fragmented: bool = True,
-        relax: bool = True,
+        relax: bool = False,
     ) -> None:
         RDLogger.DisableLog("rdApp.*")
+
+        if atom_type_map is None:
+            atom_type_map = ["C", "H", "N", "O", "F", "P", "S", "Cl", "Br", "I"]
 
         self.atom_type_map = atom_type_map
         self.validate = validate

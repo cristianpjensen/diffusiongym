@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 
 from flow_gym.base_models import BaseModel
 from flow_gym.rewards import Reward
-from flow_gym.schedulers import Scheduler
+from flow_gym.schedulers import MemorylessNoiseSchedule, Scheduler
 from flow_gym.types import DataType
 
 
@@ -39,12 +39,20 @@ class BaseEnvironment(ABC, Generic[DataType]):
         base_model: BaseModel[DataType],
         reward: Reward[DataType],
         discretization_steps: int,
+        reward_scale: float = 1.0,
     ):
         self.base_model = base_model
         self.reward = reward
         self.discretization_steps = discretization_steps
+        self.reward_scale = reward_scale
         self._policy: Optional[Policy[DataType]] = None
         self._control_policy: Optional[Policy[DataType]] = None
+        self.memoryless_schedule = MemorylessNoiseSchedule(self.scheduler)
+
+    @property
+    def device(self) -> torch.device:
+        """Get the device of the base model."""
+        return self.base_model.device
 
     @property
     def scheduler(self) -> Scheduler[DataType]:
@@ -67,7 +75,7 @@ class BaseEnvironment(ABC, Generic[DataType]):
     @property
     def is_policy_set(self) -> bool:
         """Whether a custom policy has been set."""
-        return self.policy is not None
+        return self._policy is not None
 
     @property
     def control_policy(self) -> Optional[Policy[DataType]]:
@@ -175,12 +183,12 @@ class BaseEnvironment(ABC, Generic[DataType]):
         """
         x = self.base_model.sample_p0(n)
         x, kwargs = self.base_model.preprocess(x, **kwargs)
-        trajectories = [x.to_cpu()]
+        trajectories = [x.to_device("cpu")]
 
         running_costs = torch.zeros(self.discretization_steps, n)
 
         # Start at a very small number, instead of 0, to avoid singularities
-        t = torch.linspace(1 / self.discretization_steps, 1, self.discretization_steps + 1)
+        t = torch.linspace(2e-2, 1, self.discretization_steps + 1)
         iterator: Iterable[tuple[int, tuple[Any, Any]]] = enumerate(pairwise(t))
         if pbar:
             iterator = tqdm(iterator, total=self.discretization_steps)
@@ -195,12 +203,21 @@ class BaseEnvironment(ABC, Generic[DataType]):
             x += dt * drift + torch.sqrt(dt) * diffusion * x.randn_like()
 
             running_costs[i] = running_cost
-            trajectories.append(x.to_cpu())
+            trajectories.append(x.to_device("cpu"))
 
         x = self.base_model.postprocess(x)
         rewards = self.reward(x).cpu()
-        running_costs = running_costs / self.discretization_steps
-        running_costs = torch.cat([running_costs, -rewards.unsqueeze(0)], dim=0)
         # Reverse cumulative sum
-        costs = running_costs.flip(0).cumsum(0).flip(0)
+        costs = (
+            torch.cat(
+                [
+                    running_costs / self.discretization_steps,
+                    -self.reward_scale * rewards.unsqueeze(0),
+                ],
+                dim=0,
+            )
+            .flip(0)
+            .cumsum(0)
+            .flip(0)
+        )
         return x, trajectories, running_costs, rewards, costs, kwargs

@@ -44,12 +44,36 @@ class DataProtocol(Protocol):
         """
         ...
 
-    def to_cpu(self) -> Self:
-        """Make a copy of the data and move it to CPU.
+    def to_device(self, device: torch.device | str) -> Self:
+        """Make a copy of the data and move it to the specified device.
 
         Returns
         -------
-        A copy of self on CPU.
+        A copy of self on the specified device.
+        """
+        ...
+
+    def with_requires_grad(self) -> Self:
+        """Set requires_grad=True for all elements in self.
+
+        Returns
+        -------
+        A copy of self with requires_grad=True.
+        """
+        ...
+
+    def gradient(self, x: torch.Tensor) -> Self:
+        """Compute the gradient of x with respect to self.
+
+        Parameters
+        ----------
+        x : torch.Tensor
+            A tensor to compute the gradient of.
+
+        Returns
+        -------
+        grad : Self
+            The gradient of x with respect to self.
         """
         ...
 
@@ -126,6 +150,21 @@ class FGTensor(torch.Tensor):
         """Generate zeros with the same shape and type as self."""
         return self._wrap_result(torch.zeros_like(self))
 
-    def to_cpu(self) -> "FGTensor":
-        """Make a copy of the data and move it to CPU."""
-        return self._wrap_result(self.clone().cpu())
+    def to_device(self, device: torch.device | str) -> "FGTensor":
+        """Make a copy of the data and move it to the specified device."""
+        return self._wrap_result(self.clone().to(device))
+
+    def with_requires_grad(self) -> "FGTensor":
+        """Set requires_grad=True for all elements in self."""
+        return self._wrap_result(self.clone().requires_grad_(True))
+
+    def gradient(self, x: torch.Tensor) -> "FGTensor":
+        """Compute the gradient of x w.r.t. self."""
+        grad = torch.autograd.grad(
+            outputs=x,
+            inputs=self,
+            grad_outputs=torch.ones_like(x),
+            create_graph=False,
+            retain_graph=False,
+        )[0]
+        return self._wrap_result(grad)

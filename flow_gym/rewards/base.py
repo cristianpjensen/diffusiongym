@@ -9,34 +9,8 @@ from flow_gym.types import DataType
 
 
 class Reward(ABC, Generic[DataType]):
-    """Abstract base class for all rewards.
-
-    Attributes
-    ----------
-    is_differentiable : bool
-        Whether the reward is differentiable.
-
-    """
-
-    is_differentiable = False
+    """Abstract base class for all rewards."""
 
     @abstractmethod
     def __call__(self, x: DataType) -> torch.Tensor:
         """Compute the reward for the given input x."""
-
-
-class DifferentiableReward(Reward[DataType]):
-    """Reward that supports differentiation.
-
-    Attributes
-    ----------
-    is_differentiable : bool
-        Whether the reward is differentiable.
-
-    """
-
-    is_differentiable = True
-
-    @abstractmethod
-    def gradient(self, x: DataType) -> DataType:
-        """Compute the gradient of the reward with respect to x."""

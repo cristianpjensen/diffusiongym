@@ -24,6 +24,7 @@ def make(
     base_model: Literal["images/cifar", "images/sd2"],
     reward: str,
     discretization_steps: int,
+    reward_scale: float = 1.0,
     device: Optional[torch.device | str] = None,
     base_model_kwargs: Optional[dict[str, Any]] = None,
     reward_kwargs: Optional[dict[str, Any]] = None,
@@ -36,6 +37,7 @@ def make(
     base_model: Literal["molecules/flowmol"],
     reward: str,
     discretization_steps: int,
+    reward_scale: float = 1.0,
     device: Optional[torch.device | str] = None,
     base_model_kwargs: Optional[dict[str, Any]] = None,
     reward_kwargs: Optional[dict[str, Any]] = None,
@@ -48,6 +50,7 @@ def make(
     base_model: str,
     reward: str,
     discretization_steps: int,
+    reward_scale: float = 1.0,
     device: Optional[torch.device | str] = None,
     base_model_kwargs: Optional[dict[str, Any]] = None,
     reward_kwargs: Optional[dict[str, Any]] = None,
@@ -58,6 +61,7 @@ def make(
     base_model: str,
     reward: str,
     discretization_steps: int,
+    reward_scale: float = 1.0,
     device: Optional[torch.device | str] = None,
     base_model_kwargs: Optional[dict[str, Any]] = None,
     reward_kwargs: Optional[dict[str, Any]] = None,
@@ -75,6 +79,9 @@ def make(
 
     discretization_steps : int
         The number of discretization steps to use when sampling trajectories.
+
+    reward_scale : float, default: 1.0
+        Scaling factor for the terminal reward function.
 
     device : torch.device, default: cpu
         The device to run the base model on.
@@ -146,4 +153,4 @@ def make(
         raise ValueError(f"Any env_type: {env_type}. Available: {', '.join(env_classes.keys())}")
 
     env_class = env_classes[env_type]
-    return env_class(base_model_instance, reward_instance, discretization_steps)
+    return env_class(base_model_instance, reward_instance, discretization_steps, reward_scale)
