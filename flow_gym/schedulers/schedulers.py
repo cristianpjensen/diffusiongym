@@ -42,7 +42,7 @@ class CosineScheduler(Scheduler[FGTensor]):
 
     def _alpha(self, t: torch.Tensor) -> torch.Tensor:
         result: torch.Tensor = 1 - torch.cos((t**self.nu) * torch.pi / 2).square()
-        return result
+        return result.unsqueeze(-1)
 
     def alpha(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
         r""":math:`\alpha_t`."""
@@ -56,7 +56,7 @@ class CosineScheduler(Scheduler[FGTensor]):
             * torch.sin((t**self.nu) * torch.pi / 2)
             * torch.cos((t**self.nu) * torch.pi / 2)
         )
-        return result
+        return result.unsqueeze(-1)
 
     def alpha_dot(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
         r""":math:`\dot{\alpha}_t`."""
@@ -109,7 +109,7 @@ class DiffusionScheduler(Scheduler[FGTensor]):
 
     def _alpha_dot(self, t: torch.Tensor) -> torch.Tensor:
         k = self._get_index(t)
-        return 0.5 * self.alpha_bar_dot[k] / self._alpha(t)
+        return 0.5 * self.alpha_bar_dot[k].unsqueeze(-1) / self._alpha(t)
 
     def alpha_dot(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
         r""":math:`\dot{\alpha}_t`."""
@@ -117,7 +117,7 @@ class DiffusionScheduler(Scheduler[FGTensor]):
 
     def _beta_dot(self, t: torch.Tensor) -> torch.Tensor:
         k = self._get_index(t)
-        return -0.5 * self.alpha_bar_dot[k] / self._beta(t)
+        return -0.5 * self.alpha_bar_dot[k].unsqueeze(-1) / self._beta(t)
 
     def beta_dot(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
         r""":math:`\dot{\beta}_t`."""

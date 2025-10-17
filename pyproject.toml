@@ -42,10 +42,12 @@ dev = { features = ["dev", "molecules", "images"], solve-group = "default"}
 
 [tool.pixi.feature.molecules.dependencies]
 rdkit = "==2023.9.4"
+prody = "*"
 
 [tool.pixi.feature.molecules.pypi-dependencies]
-dgl = { version = "==2.4.0" }
+dgl = "==2.4.0"
 flowmol = { git = "https://github.com/cristianpjensen/FlowMol.git", rev = "13c3d1e2abca413dd8d1d05e43ac235c540fd1f2" }
+meeko = "==0.6.1"
 
 [tool.pixi.feature.molecules.activation]
 env = { DGLBACKEND = "pytorch" }
@@ -136,6 +138,8 @@ module = [
     "flowmol.*",
     "torch_scatter",
     "torch_scatter.*",
+    "meeko",
+    "meeko.*",
 ]
 ignore_missing_imports = true
 
