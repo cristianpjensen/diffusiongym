@@ -67,7 +67,7 @@ autodoc_default_options = {
 theme_options = ThemeOptions(
     show_prev_next=True,
     awesome_external_links=True,
-    main_nav_links={"Docs": "/index", "Changelog": "/flowgym/changelog"},
+    main_nav_links={"Docs": "/flowgym/index", "Changelog": "/flowgym/changelog/index"},
     extra_header_link_icons={
         "Repository on GitHub": {
             "link": "https://github.com/cristianpjensen/flowgym",

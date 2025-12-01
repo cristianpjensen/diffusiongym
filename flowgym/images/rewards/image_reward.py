@@ -44,8 +44,8 @@ class ImageReward(Reward[FGTensor]):
         with torch.autocast("cuda", enabled=False):
             pil_imgs = [to_pil_image(img.cpu().to(dtype=torch.float)) for img in x]
 
-        rewards = []
-        for prompt_txt, pil_img in zip(prompt, pil_imgs):
-            rewards.append(self.reward_model.score(prompt_txt, pil_img))
+            rewards = []
+            for prompt_txt, pil_img in zip(prompt, pil_imgs):
+                rewards.append(self.reward_model.score(prompt_txt, pil_img))
 
         return torch.tensor(rewards), torch.ones(x.shape[0])
