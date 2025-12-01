@@ -13,7 +13,7 @@ In order to sample a base model and use it for reward adaptation, you need to fi
 - Gradient methods (``with_requires_grad``, ``gradient``).
 - Helper methods (``batch_sum``, ``to_device``).
 
-See ``flow_gym/types.py`` for more details on the methods, and see ``flow_gym/molecules/types.py`` for an example implementation for molecules using an underlying DGL graph.
+See ``flowgym/types.py`` for more details on the methods, and see ``flowgym/molecules/types.py`` for an example implementation for molecules using an underlying DGL graph.
 
 Base model
 ----------
@@ -22,7 +22,7 @@ Next, you need to define a base model that operates on this data type. This base
 
 - ``scheduler (Scheduler[YourDataType])``: The :math:`(\alpha_t, \beta_t)` flow matching schedule.
 - ``sample_p0``: How to sample from :math:`p_0`.
-- ``forward``: The forward pass of the base model, which takes in :math:`(x_t, t)` and outputs one of the following: marginal noise :math:`\epsilon`, velocity :math:`v`, endpoint :math:`x_1`, or score :math:`\nabla_x \log p_t(x_t)`. Make sure to set ``output_type`` accordingly, so ``flow_gym.make`` will know what environment to use.
+- ``forward``: The forward pass of the base model, which takes in :math:`(x_t, t)` and outputs one of the following: marginal noise :math:`\epsilon`, velocity :math:`v`, endpoint :math:`x_1`, or score :math:`\nabla_x \log p_t(x_t)`. Make sure to set ``output_type`` accordingly, so ``flowgym.make`` will know what environment to use.
 - ``preprocess``: Preprocess procedure to convert :math:`x_0` and any keyword arguments (e.g., to encode prompts).
 - ``postprocess``: Postprocess procedure to convert :math:`x_1` to the desired output format (e.g., convert from latent space to pixel space in latent diffusion models).
 

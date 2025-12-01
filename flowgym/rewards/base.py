@@ -1,4 +1,4 @@
-"""Base reward classes and interfaces for flow_gym."""
+"""Base reward classes and interfaces for flowgym."""
 
 from abc import ABC, abstractmethod
 from typing import Any, Generic

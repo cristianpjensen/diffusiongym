@@ -9,7 +9,7 @@ Data type
 ---------
 
 For images, we can simply use tensors as the datatype. *flowgym* already has a wrapper for this in
-``FGTensor``. See :ref:`flow_gym/types.py` for implementation details.
+``FGTensor``. See :ref:`flowgym/types.py` for implementation details.
 
 Scheduler
 ---------
@@ -129,7 +129,7 @@ U-net model, which predicts the noise:
       return FGTensor(self.pipe.unet(x_tensor, k, kwargs["encoder_hidden_states"]).sample)
 
 This can additionally be altered by adding classifier-free guidance, as in
-:ref:`flow_gym/images/base_models/stable_diffusion.py`.
+:ref:`flowgym/images/base_models/stable_diffusion.py`.
 
 Postprocessing
 ^^^^^^^^^^^^^^

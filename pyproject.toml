@@ -56,13 +56,17 @@ env = { DGLBACKEND = "pytorch" }
 
 [tool.pixi.feature.images.pypi-dependencies]
 diffusers = "==0.33.1"
+transformers = "<4.43"
+image-reward = "*"
+clip = "*"
+open_clip_torch = "*"
 
 [tool.pixi.feature.dev.tasks]
 fmt = { cmd="ruff format flowgym value_matching" }
 lint = { cmd="ruff check flowgym value_matching --fix" }
 types = { cmd="mypy" }
 all = { depends-on = ["fmt", "lint", "types"] }
-docs = "sphinx-build -b html docs docs/_build"
+docs = { cmd = "sphinx-build -b html docs docs/_build" }
 
 [tool.pixi.feature.dev.dependencies]
 ruff = ">=0.11"

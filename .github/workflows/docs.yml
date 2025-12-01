@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: prefix-dev/setup-pixi@v0.8.1
-      - run: pixi run -e dev sphinx-build -b html docs docs/_build/html
+      - run: pixi run -e dev docs
       - uses: actions/upload-pages-artifact@v3
         with:
           path: docs/_build/html

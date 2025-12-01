@@ -1,4 +1,4 @@
-"""flow_gym package."""
+"""flowgym package."""
 
 from flowgym.base_models import BaseModel
 from flowgym.environments import (

@@ -5,9 +5,8 @@
 </div>
 
 <p align="center">
-<a href="https://github.com/cristianpjensen/flow-gym/blob/master/LICENSE"><img alt="License" src="https://img.shields.io/github/license/cristianpjensen/flow_gym"></a>
+<a href="https://github.com/cristianpjensen/flow-gym/blob/master/LICENSE"><img alt="License" src="https://img.shields.io/github/license/cristianpjensen/flowgym"></a>
 <a href="https://github.com/astral-sh/ruff"><img alt="Code style: ruff" src="https://img.shields.io/badge/code%20style-ruff-000000.svg"></a>
-<a href="https://github.com/cristianpjensen/flow-gym/actions/"><img alt="GitHub Workflow Status" src="https://img.shields.io/github/actions/workflow/status/cristianpjensen/flow_gym/test.yml?branch=master&logo=github-actions"></a>
 </p>
 
 `flowgym` is a library for reward adaptation of any pre-trained flow model on any data modality.

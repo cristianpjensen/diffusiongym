@@ -4,6 +4,8 @@ import os
 import sys
 from dataclasses import asdict
 
+sys.path.insert(0, os.path.abspath(".."))
+
 from sphinxawesome_theme import ThemeOptions
 from sphinxawesome_theme.postprocess import Icons
 
@@ -52,8 +54,6 @@ html_baseurl = "https://cristianpjensen.github.io/flowgym/"
 html_context = {
     "mode": "production",
 }
-
-sys.path.insert(0, os.path.abspath(".."))
 
 autosummary_generate = True
 autosummary_format_signature = ""

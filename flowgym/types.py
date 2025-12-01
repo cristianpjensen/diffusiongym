@@ -1,4 +1,4 @@
-"""Custom types for flow_gym."""
+"""Custom types for flowgym."""
 
 from typing import Protocol, TypeVar, Union
 
@@ -7,7 +7,7 @@ from typing_extensions import Self
 
 
 class DataProtocol(Protocol):
-    """Protocol defining the required interface for data types in flow_gym.
+    """Protocol defining the required interface for data types in flowgym.
 
     Types implementing this protocol must support arithmetic operations, factory methods
     (randn_like, ones_like, zeros_like), and batch reduction operations (batch_sum).

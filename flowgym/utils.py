@@ -1,4 +1,4 @@
-"""Utility functions for flow_gym."""
+"""Utility functions for flowgym."""
 
 import os
 import tempfile

@@ -1,4 +1,4 @@
-"""Base environment classes and interfaces for flow_gym."""
+"""Base environment classes and interfaces for flowgym."""
 
 from abc import ABC, abstractmethod
 from itertools import pairwise

@@ -1,7 +1,7 @@
 Using the Registries
 ====================
 
-When deining a base model and a reward function, it is recommended to register them so that they can be easily combined using ``flow_gym.make``.
+When deining a base model and a reward function, it is recommended to register them so that they can be easily combined using ``flowgym.make``.
 You can register them as follows:
 
 .. code-block:: python

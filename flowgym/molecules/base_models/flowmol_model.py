@@ -31,7 +31,7 @@ class FlowMolBaseModel(BaseModel[FGGraph]):
         self._scheduler = FlowMolScheduler(scheduler_params)
         self._scheduler.noise_schedule = ConstantNoiseSchedule(0)
 
-        with open("flow_gym/molecules/base_models/qm9_dipole_moments.json", "r") as f:
+        with open("flowgym/molecules/base_models/qm9_dipole_moments.json", "r") as f:
             self.dipole_moments = json.load(f)
 
     @property

@@ -32,7 +32,7 @@ class StableDiffusionBaseModel(BaseModel[FGTensor]):
         pipe.scheduler.alphas_cumprod = pipe.scheduler.alphas_cumprod.to(device)
         self._scheduler = DiffusionScheduler(pipe.scheduler.alphas_cumprod)
 
-        with open("flow_gym/images/base_models/refl_data.json", "r") as f:
+        with open("flowgym/images/base_models/refl_data.json", "r") as f:
             refl_data = json.load(f)
 
         self.prompts = [item["text"] for item in refl_data]

@@ -1,4 +1,4 @@
-"""Factory function for creating flow_gym environments."""
+"""Factory function for creating flowgym environments."""
 
 from typing import TYPE_CHECKING, Any, Literal, Optional, overload
 
@@ -66,7 +66,7 @@ def make(
     base_model_kwargs: Optional[dict[str, Any]] = None,
     reward_kwargs: Optional[dict[str, Any]] = None,
 ) -> Environment[Any]:
-    """Create a flow_gym environment from registered base models and rewards.
+    """Create a flowgym environment from registered base models and rewards.
 
     Parameters
     ----------
@@ -108,8 +108,8 @@ def make(
 
     Examples
     --------
-    >>> import flow_gym
-    >>> env = flow_gym.make(
+    >>> import flowgym
+    >>> env = flowgym.make(
     ...     base_model="images/sd2",
     ...     reward="images/compression",
     ...     discretization_steps=100,
