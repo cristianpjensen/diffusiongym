@@ -1,5 +1,5 @@
 [project]
-name = "flow_gym"
+name = "flowgym"
 description = "Flow Gym"
 license = {file = "LICENSE"}
 version = "1.0"
@@ -9,8 +9,8 @@ authors = [{name = "Cristian Perez Jensen"}]
 requires-python = ">=3.8,<3.12"
 
 [project.urls]
-Homepage = "https://github.com/cristianpjensen/flow-gym"
-Issues = "https://github.com/cristianpjensen/flow-gym/issues"
+Homepage = "https://github.com/cristianpjensen/flowgym"
+Issues = "https://github.com/cristianpjensen/flowgym/issues"
 
 [tool.pixi.project]
 channels = ["conda-forge"]
@@ -32,12 +32,13 @@ find-links = [
 [tool.pixi.pypi-dependencies]
 torch = { version = "==2.3.1", index = "https://download.pytorch.org/whl/cu121" }
 torchvision = { version = "==0.18.1", index = "https://download.pytorch.org/whl/cu121" }
-flow_gym = { path = ".", editable = true }
+flowgym = { path = ".", editable = true }
 
 [tool.pixi.environments]
 default = { solve-group = "default" }
 molecules = { features = ["molecules"], solve-group = "default"}
 images = { features = ["images"], solve-group = "default"}
+all = { features = ["images", "molecules"], solve-group = "default" }
 dev = { features = ["dev", "molecules", "images"], solve-group = "default"}
 
 [tool.pixi.feature.molecules.dependencies]
@@ -46,40 +47,33 @@ prody = "*"
 
 [tool.pixi.feature.molecules.pypi-dependencies]
 dgl = "==2.4.0"
-flowmol = { git = "https://github.com/cristianpjensen/FlowMol.git", rev = "13c3d1e2abca413dd8d1d05e43ac235c540fd1f2" }
+flowmol = { git = "https://github.com/cristianpjensen/FlowMol.git", rev = "a666676c2f3835fc410dede22eb41c5c7c4f2eb8" }
 meeko = "==0.6.1"
+rdkit-stubs = "*"
 
 [tool.pixi.feature.molecules.activation]
 env = { DGLBACKEND = "pytorch" }
 
 [tool.pixi.feature.images.pypi-dependencies]
 diffusers = "==0.33.1"
-accelerate = "*"
-transformers = "<4.43"
 
 [tool.pixi.feature.dev.tasks]
-fmt = { cmd="ruff format ." }
-lint = { cmd="ruff check . --fix" }
+fmt = { cmd="ruff format flowgym value_matching" }
+lint = { cmd="ruff check flowgym value_matching --fix" }
 types = { cmd="mypy" }
-test = { cmd="pytest" }
-all = { depends-on = ["fmt", "lint", "types", "test"] }
+all = { depends-on = ["fmt", "lint", "types"] }
 docs = "sphinx-build -b html docs docs/_build"
 
 [tool.pixi.feature.dev.dependencies]
-pytest = ">=8.3"
-pytest-cov = ">=6.0"
 ruff = ">=0.11"
 mypy = ">=1.15"
 pre-commit = ">=4.2"
-sphinx = ">=8.2.3,<9"
-furo = ">=2024.8.6,<2025"
+sphinx = ">=7.2.0,<7.3"
+sphinxawesome-theme = "*"
 sphinx-autobuild = ">=2024.10.3,<2025"
 myst-parser = ">=4.0.1,<5"
 ipykernel = ">=6.30.1,<7"
 pip = ">=25.2,<26"
-
-[tool.pixi.feature.dev.pypi-dependencies]
-rdkit-stubs = "*"
 
 [tool.ruff]
 line-length = 100
@@ -123,7 +117,7 @@ ignore = [
 convention = "numpy"
 
 [tool.mypy]
-files = ["flow_gym", "tests"]
+files = ["flowgym"]
 strict = true
 pretty = true
 [[tool.mypy.overrides]]
@@ -142,15 +136,6 @@ module = [
     "meeko.*",
 ]
 ignore_missing_imports = true
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-filterwarnings = [
-    "ignore:Can't initialize NVML:UserWarning:torch.cuda",
-    "ignore:invalid escape sequence:DeprecationWarning:dgl.backend.backend",
-    "ignore::DeprecationWarning:rdkit",
-    "ignore::DeprecationWarning:torchmetrics.utilities.imports",
-]
 
 [tool.hatch.metadata]
 allow-direct-references = true

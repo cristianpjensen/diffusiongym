@@ -1,13 +1,15 @@
 Environments
 ============
 
-.. currentmodule:: flow_gym.environments
+.. currentmodule:: flowgym.environments
 
 .. autosummary::
     :toctree: generated/
     :template: class.rst
     :nosignatures:
 
-    BaseEnvironment
+    Environment
     ScoreEnvironment
     EpsilonEnvironment
+    VelocityEnvironment
+    EndpointEnvironment

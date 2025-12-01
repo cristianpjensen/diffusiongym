@@ -1,7 +1,7 @@
 Types
 =====
 
-.. currentmodule:: flow_gym.types
+.. currentmodule:: flowgym.types
 
 .. autosummary::
     :toctree: generated/

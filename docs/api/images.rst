@@ -1,7 +1,7 @@
-Images (optional)
-==================
+Images
+======
 
-.. currentmodule:: flow_gym.images
+.. currentmodule:: flowgym.images
 
 .. autosummary::
     :toctree: generated/
@@ -9,5 +9,11 @@ Images (optional)
     :nosignatures:
 
     CIFARBaseModel
+    DiTBaseModel
+    StableDiffusionBaseModel
+    SD15BaseModel
+    SD2BaseModel
     CompressionReward
     IncompressionReward
+    AestheticReward
+    ImageReward

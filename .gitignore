@@ -182,3 +182,6 @@ pyrightconfig.json
 docs/api/generated/
 .DS_Store
 *.png
+jobs/
+slurm-*
+*.pt

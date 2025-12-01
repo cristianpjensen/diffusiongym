@@ -1,7 +1,7 @@
 Schedulers
 ==========
 
-.. currentmodule:: flow_gym.schedulers
+.. currentmodule:: flowgym.schedulers
 
 .. autosummary::
     :toctree: generated/
