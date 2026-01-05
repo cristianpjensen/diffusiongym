@@ -1,7 +1,5 @@
 """Pre-trained continuous FlowMol model, trained on GEOM-Drugs."""
 
-import json
-import random
 from typing import Any
 
 import dgl
@@ -10,11 +8,12 @@ import torch
 from flowmol.data_processing.utils import build_edge_idxs, get_batch_idxs, get_upper_edge_mask
 
 from flowgym import BaseModel, ConstantNoiseSchedule, CosineScheduler, Scheduler
-from flowgym.molecules.types import FGGraph
+from flowgym.molecules.types import FlowGraph
 from flowgym.registry import base_model_registry
+from flowgym.types import FlowTensor
 
 
-class FlowMolBaseModel(BaseModel[FGGraph]):
+class FlowMolBaseModel(BaseModel[FlowGraph]):
     """Pre-trained FlowMol on GEOM-Drugs and QM9."""
 
     output_type = "endpoint"
@@ -31,15 +30,12 @@ class FlowMolBaseModel(BaseModel[FGGraph]):
         self._scheduler = FlowMolScheduler(scheduler_params)
         self._scheduler.noise_schedule = ConstantNoiseSchedule(0)
 
-        with open("flowgym/molecules/base_models/qm9_dipole_moments.json", "r") as f:
-            self.dipole_moments = json.load(f)
-
     @property
     def scheduler(self) -> "FlowMolScheduler":
         """Scheduler used for sampling."""
         return self._scheduler
 
-    def sample_p0(self, n: int, **kwargs: Any) -> tuple[FGGraph, dict[str, Any]]:
+    def sample_p0(self, n: int, **kwargs: Any) -> tuple[FlowGraph, dict[str, Any]]:
         """Sample n datapoints from the base distribution :math:`p_0`.
 
         Parameters
@@ -49,7 +45,7 @@ class FlowMolBaseModel(BaseModel[FGGraph]):
 
         Returns
         -------
-        samples : FGGraph
+        samples : FlowGraph
             Samples from the base distribution :math:`p_0`.
 
         Notes
@@ -57,7 +53,6 @@ class FlowMolBaseModel(BaseModel[FGGraph]):
         The base distribution :math:`p_0` is a standard Gaussian distribution.
         """
         n_atoms = self.model.sample_n_atoms(n)
-        dipole_moment_targets = []
 
         edge_idxs_dict = {}
         for n_atoms_i in torch.unique(n_atoms):
@@ -68,11 +63,6 @@ class FlowMolBaseModel(BaseModel[FGGraph]):
             edge_idxs = edge_idxs_dict[int(n_atoms_i)]
             g_i = dgl.graph((edge_idxs[0], edge_idxs[1]), num_nodes=n_atoms_i, device=self.device)
             g.append(g_i)
-
-            # Sample a random dipole moment target for this molecule size from the ones of QM9
-            # Can be used to target specific dipole moments during sampling
-            dipole_moments = self.dipole_moments[str(n_atoms_i.item())]
-            dipole_moment_targets.append(random.choice(dipole_moments))
 
         g = dgl.batch(g)
         ue_mask = get_upper_edge_mask(g)
@@ -88,12 +78,9 @@ class FlowMolBaseModel(BaseModel[FGGraph]):
             if key.endswith("_0"):
                 g.edata[key[:-2] + "_t"] = g.edata.pop(key)
 
-        return (
-            FGGraph(g, ue_mask, n_idx, e_idx),
-            {"dipole_moment_target": torch.tensor(dipole_moment_targets)},
-        )
+        return FlowGraph(g, ue_mask, n_idx, e_idx), kwargs
 
-    def postprocess(self, x: FGGraph) -> FGGraph:
+    def postprocess(self, x: FlowGraph) -> FlowGraph:
         """Re-name features from x_t to x_1."""
         g = x.graph
         for key in list(g.ndata.keys()):
@@ -106,9 +93,9 @@ class FlowMolBaseModel(BaseModel[FGGraph]):
 
         # To enable usage with SampledMolecule from flowmol
         g.edata["ue_mask"] = x.ue_mask
-        return FGGraph(g, x.ue_mask, x.n_idx, x.e_idx)
+        return FlowGraph(g, x.ue_mask, x.n_idx, x.e_idx)
 
-    def forward(self, x: FGGraph, t: torch.Tensor, **kwargs: Any) -> FGGraph:
+    def forward(self, x: FlowGraph, t: torch.Tensor, **kwargs: Any) -> FlowGraph:
         r"""Compute the endpoint vector field :math:`\hat{x_1}(x, t)`."""
         output = self.model.vector_field(
             x.graph,
@@ -132,10 +119,10 @@ class FlowMolBaseModel(BaseModel[FGGraph]):
                 edge_data[~x.ue_mask] = output[key[:-2]]  # Assign same values to lower edges
                 out_graph.edata[key] = edge_data
 
-        return FGGraph(out_graph, x.ue_mask, x.n_idx, x.e_idx)
+        return FlowGraph(out_graph, x.ue_mask, x.n_idx, x.e_idx)
 
 
-class FlowMolScheduler(Scheduler[FGGraph]):
+class FlowMolScheduler(Scheduler[FlowGraph]):
     """Scheduler for the GEOM-Drugs dataset."""
 
     def __init__(
@@ -150,20 +137,22 @@ class FlowMolScheduler(Scheduler[FGGraph]):
         }
         self.scheduler_order = ["x_t", "a_t", "c_t", "e_t"]
 
-    def _alpha(self, t: torch.Tensor) -> torch.Tensor:
+    def _alpha(self, x: FlowGraph, t: torch.Tensor) -> torch.Tensor:
         out = torch.zeros(t.shape[0], len(self.schedulers), device=t.device, dtype=t.dtype)
         for idx, key in enumerate(self.scheduler_order):
-            out[:, idx] = self.schedulers[key]._alpha(t).squeeze(-1)
+            val = self.schedulers[key].alpha(
+                FlowTensor(torch.zeros(x.graph.batch_size, 1, device=x.device)), t
+            )
+            out[:, idx] = val.data.squeeze(-1)
 
         return out
 
-    def alpha(self, x: FGGraph, t: torch.Tensor) -> FGGraph:
+    def alpha(self, x: FlowGraph, t: torch.Tensor) -> FlowGraph:
         r""":math:`\alpha_t`."""
         g = x.graph
         res = x._get_empty_graph()
 
-        alphas = self._alpha(t)
-
+        alphas = self._alpha(x, t)
         for idx, key in enumerate(self.scheduler_order):
             if key in g.ndata:
                 t_alpha = alphas[:, idx].unsqueeze(-1)
@@ -174,22 +163,24 @@ class FlowMolScheduler(Scheduler[FGGraph]):
             else:
                 raise ValueError(f"Key {key} not found in graph data.")
 
-        return FGGraph(res, x.ue_mask, x.n_idx, x.e_idx)
+        return FlowGraph(res, x.ue_mask, x.n_idx, x.e_idx)
 
-    def _alpha_dot(self, t: torch.Tensor) -> torch.Tensor:
+    def _alpha_dot(self, x: FlowGraph, t: torch.Tensor) -> torch.Tensor:
         out = torch.zeros(t.shape[0], len(self.schedulers), device=t.device, dtype=t.dtype)
         for idx, key in enumerate(self.scheduler_order):
-            out[:, idx] = self.schedulers[key]._alpha_dot(t).squeeze(-1)
+            val = self.schedulers[key].alpha_dot(
+                FlowTensor(torch.zeros(x.graph.batch_size, 1, device=x.device)), t
+            )
+            out[:, idx] = val.data.squeeze(-1)
 
         return out
 
-    def alpha_dot(self, x: FGGraph, t: torch.Tensor) -> FGGraph:
+    def alpha_dot(self, x: FlowGraph, t: torch.Tensor) -> FlowGraph:
         r""":math:`\dot{\alpha}_t`."""
         g = x.graph
         res = x._get_empty_graph()
 
-        alpha_dots = self._alpha_dot(t)
-
+        alpha_dots = self._alpha_dot(x, t)
         for idx, key in enumerate(self.scheduler_order):
             if key in g.ndata:
                 t_alpha_dot = alpha_dots[:, idx].unsqueeze(-1)
@@ -200,7 +191,7 @@ class FlowMolScheduler(Scheduler[FGGraph]):
             else:
                 raise ValueError(f"Key {key} not found in graph data.")
 
-        return FGGraph(res, x.ue_mask, x.n_idx, x.e_idx)
+        return FlowGraph(res, x.ue_mask, x.n_idx, x.e_idx)
 
 
 @base_model_registry.register("molecules/flowmol_geom")

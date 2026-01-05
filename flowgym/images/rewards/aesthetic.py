@@ -10,12 +10,12 @@ from PIL import Image
 from torch import nn
 from torchvision import transforms
 
-from flowgym import FGTensor, Reward
+from flowgym import FlowTensor, Reward
 from flowgym.registry import reward_registry
 
 
 @reward_registry.register("images/aesthetic")
-class AestheticReward(Reward[FGTensor]):
+class AestheticReward(Reward[FlowTensor]):
     """Aesthetic reward based on the aesthetic predictor from LAION."""
 
     def __init__(self) -> None:
@@ -37,7 +37,7 @@ class AestheticReward(Reward[FGTensor]):
             ]
         )
 
-    def __call__(self, x: FGTensor, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
+    def __call__(self, x: FlowTensor, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
         """Compute the image reward for a batch of images.
 
         Parameters
@@ -50,18 +50,20 @@ class AestheticReward(Reward[FGTensor]):
         rewards : torch.Tensor, shape (B,)
             Image rewards.
         """
-        if x.min() < 0 or x.max() > 1:
-            raise ValueError(f"`x` must have values in [0, 1], got [{x.min()}, {x.max()}]")
+        if x.data.min() < 0 or x.data.max() > 1:
+            raise ValueError(
+                f"`x` must have values in [0, 1], got [{x.data.min()}, {x.data.max()}]"
+            )
 
-        preprocessed_imgs = self.preprocess(x)
+        preprocessed_imgs = self.preprocess(x.data)
         rewards = []
         for img_ in preprocessed_imgs:
             img = img_.to(self.device).unsqueeze(0)
-            img_feats = self.clip.encode_image(img)
+            img_feats = self.clip.encode_image(img)  # type: ignore
             img_feats /= img_feats.norm(dim=-1, keepdim=True)
             rewards.append(self.model(img_feats))
 
-        return torch.cat(rewards).squeeze(-1), torch.ones(x.shape[0])
+        return torch.cat(rewards).squeeze(-1), torch.ones(len(x), device=x.device)
 
     def _get_aesthetic_model(self, clip_model: str = "vit_l_14") -> nn.Module:
         """Source: https://github.com/LAION-AI/aesthetic-predictor/blob/main/asthetics_predictor.ipynb."""

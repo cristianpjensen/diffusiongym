@@ -11,6 +11,7 @@ Molecules
     :template: class.rst
     :nosignatures:
 
+    FlowGraph
     FlowMolBaseModel
     QM9BaseModel
     GEOMBaseModel

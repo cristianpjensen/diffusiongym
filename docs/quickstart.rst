@@ -6,12 +6,13 @@ This quickstart guides you through how to define your own data type, base model,
 Data type
 ---------
 
-In order to sample a base model and use it for reward adaptation, you need to first define a data type for your modality. This data type must implement the ``DataProtocol``, which defines:
+In order to sample a base model and use it for reward adaptation, you need to first define a data type for your modality. This data type must implement the ``FlowProtocol``, which defines:
 
-- Arithmetic operations (``__add__``, ``__sub__``, ``__mul__``, ``__truediv__``, ``__neg__``, ``__radd__``, ``__rsub__``, ``__rmul__``, ``__pow__``).
-- Factory methods (``randn_like``, ``ones_like``, ``zeros_like``).
-- Gradient methods (``with_requires_grad``, ``gradient``).
-- Helper methods (``batch_sum``, ``to_device``).
+- ``apply``, which applies a unary operation on the underlying data.
+- ``combine``, which applies a binary operation on the underlying data.
+- ``aggregate``, which computes a sum over the underlying data per sample in the batch.
+- ``collate``, which collates a list of data type instances into a batched instance.
+- ``__len__`` and ``__getitem__`` to support indexing.
 
 See ``flowgym/types.py`` for more details on the methods, and see ``flowgym/molecules/types.py`` for an example implementation for molecules using an underlying DGL graph.
 

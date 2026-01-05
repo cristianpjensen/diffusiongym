@@ -4,15 +4,10 @@
    :maxdepth: 2
    :caption: Core
 
-   api/base_models
-   api/environments
-   api/rewards
-   api/schedulers
    api/types
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Optional
-
+   api/base_models
+   api/schedulers
+   api/rewards
+   api/environments
    api/images
    api/molecules

@@ -1,5 +1,12 @@
 """flowgym package."""
 
+from importlib.metadata import PackageNotFoundError, version
+
+try:
+    __version__ = version("flowgym")
+except PackageNotFoundError:
+    __version__ = "0.0.0"
+
 from flowgym.base_models import BaseModel
 from flowgym.environments import (
     EndpointEnvironment,
@@ -8,7 +15,7 @@ from flowgym.environments import (
     ScoreEnvironment,
     VelocityEnvironment,
 )
-from flowgym.make import make
+from flowgym.make import construct_env, make
 from flowgym.registry import base_model_registry, reward_registry
 from flowgym.rewards import Reward
 from flowgym.schedulers import (
@@ -20,19 +27,19 @@ from flowgym.schedulers import (
     OptimalTransportScheduler,
     Scheduler,
 )
-from flowgym.types import DataProtocol, DataType, FGTensor
+from flowgym.types import D, FlowMixin, FlowTensor
 
 __all__ = [
     "BaseModel",
     "ConstantNoiseSchedule",
     "CosineScheduler",
-    "DataProtocol",
-    "DataType",
+    "D",
     "DiffusionScheduler",
     "EndpointEnvironment",
     "Environment",
     "EpsilonEnvironment",
-    "FGTensor",
+    "FlowMixin",
+    "FlowTensor",
     "MemorylessNoiseSchedule",
     "NoiseSchedule",
     "OptimalTransportScheduler",
@@ -41,26 +48,9 @@ __all__ = [
     "ScoreEnvironment",
     "VelocityEnvironment",
     "base_model_registry",
+    "construct_env",
+    "images",
     "make",
+    "molecules",
     "reward_registry",
 ]
-
-try:
-    from . import molecules
-
-    HAS_MOLECULES = True
-except ImportError:
-    HAS_MOLECULES = False
-
-try:
-    from . import images
-
-    HAS_IMAGES = True
-except ImportError:
-    HAS_IMAGES = False
-
-if HAS_MOLECULES:
-    __all__ += ["molecules"]
-
-if HAS_IMAGES:
-    __all__ += ["images"]

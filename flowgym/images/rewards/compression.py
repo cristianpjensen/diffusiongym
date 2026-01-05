@@ -6,7 +6,7 @@ from typing import Any
 import torch
 from torchvision.transforms.functional import to_pil_image
 
-from flowgym import FGTensor, Reward
+from flowgym import FlowTensor, Reward
 from flowgym.registry import reward_registry
 
 
@@ -37,7 +37,7 @@ def _bits_per_pixel(imgs: torch.Tensor, quality_level: int) -> torch.Tensor:
 
 
 @reward_registry.register("images/incompression")
-class IncompressionReward(Reward[FGTensor]):
+class IncompressionReward(Reward[FlowTensor]):
     """Incompression reward for image models.
 
     Typically, when this reward is maximized, it encourages the model to produce images that have
@@ -60,7 +60,7 @@ class IncompressionReward(Reward[FGTensor]):
     def __init__(self, quality_level: int = 85):
         self.quality_level = quality_level
 
-    def __call__(self, x: FGTensor, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
+    def __call__(self, x: FlowTensor, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
         """Compute the incompression reward for a batch of images.
 
         Parameters
@@ -73,11 +73,11 @@ class IncompressionReward(Reward[FGTensor]):
         rewards : torch.Tensor, shape (B,)
             Incompression reward (bits per pixel) for each image.
         """
-        return _bits_per_pixel(torch.Tensor(x), self.quality_level), torch.ones(x.shape[0])
+        return _bits_per_pixel(x.data, self.quality_level), torch.ones(len(x), device=x.device)
 
 
 @reward_registry.register("images/compression")
-class CompressionReward(Reward[FGTensor]):
+class CompressionReward(Reward[FlowTensor]):
     """Compression reward for image models.
 
     Typically, when this reward is maximized, it encourages the model to produce images that look
@@ -100,7 +100,7 @@ class CompressionReward(Reward[FGTensor]):
     def __init__(self, quality_level: int = 85):
         self.quality_level = quality_level
 
-    def __call__(self, x: FGTensor, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
+    def __call__(self, x: FlowTensor, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
         """Compute the compression reward for a batch of images.
 
         Parameters
@@ -113,4 +113,4 @@ class CompressionReward(Reward[FGTensor]):
         rewards : torch.Tensor, shape (B,)
             Compression reward (negative bits per pixel) for each image.
         """
-        return -_bits_per_pixel(torch.Tensor(x), self.quality_level), torch.ones(x.shape[0])
+        return -_bits_per_pixel(x.data, self.quality_level), torch.ones(len(x), device=x.device)

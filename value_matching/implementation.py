@@ -10,20 +10,20 @@ import torch
 from torch import nn
 from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR
 
-from flowgym import DataType, Environment
+from flowgym import D, Environment
 from flowgym.utils import ValuePolicy
 from value_matching.utils import Report
 
 
 def value_matching(
     value_network: nn.Module,
-    env: Environment[DataType],
+    env: Environment[D],
     batch_size: int = 128,
     num_iterations: int = 1000,
     lr: float = 1e-4,
     log_every: Optional[int] = None,
     exp_dir: Optional[os.PathLike[str]] = None,
-    fn_every: Optional[Callable[[int, Environment[DataType]], None]] = None,
+    fn_every: Optional[Callable[[int, Environment[D]], None]] = None,
     kwargs: Optional[dict] = None,
 ) -> None:
     """Run value matching to train a value network.
@@ -60,7 +60,7 @@ def value_matching(
     value_network.to(env.device)
 
     opt = torch.optim.Adam(value_network.parameters(), lr=lr)
-    warmup = LinearLR(opt, start_factor=0.1, total_iters=100)
+    warmup = LinearLR(opt, start_factor=1.0, total_iters=100)
     cosine = CosineAnnealingLR(opt, T_max=num_iterations - 100, eta_min=1e-2 * lr)
     scheduler = SequentialLR(opt, [warmup, cosine], milestones=[100])
 
@@ -82,10 +82,12 @@ def value_matching(
 
     for it in range(1, num_iterations + 1):
         with torch.no_grad():
-            _, trajectories, _, _, running_costs, rewards, valids, costs, kwargs = env.sample(
-                batch_size,
-                pbar=False,
-                **kwargs,
+            _, trajectories, _, _, running_costs, rewards, valids, costs, current_kwargs = (
+                env.sample(
+                    batch_size,
+                    pbar=False,
+                    **kwargs,
+                )
             )
 
         opt.zero_grad()
@@ -93,11 +95,11 @@ def value_matching(
         # Accumulate gradients
         total_loss = 0.0
         for idx, t in enumerate(torch.linspace(2e-2, 1, env.discretization_steps + 1)):
-            x_t = trajectories[idx].to_device(env.device)
+            x_t = trajectories[idx].to(env.device)
             t_curr = t.expand(batch_size).to(env.device)
             weight = weights[idx]
 
-            output = value_network(x_t, t_curr, **kwargs).squeeze(-1)
+            output = value_network(x_t, t_curr, **current_kwargs).squeeze(-1)
             target = costs[idx].to(env.device)
 
             loss = (weight * ((output - target) / env.reward_scale).square()).mean()
@@ -157,7 +159,7 @@ def value_matching(
             fn_every(it, env)
 
 
-def get_loss_weights(env: Environment[DataType]) -> torch.Tensor:
+def get_loss_weights(env: Environment[D]) -> torch.Tensor:
     """Compute loss weights for value matching, inversely proportional to future variance.
 
     Parameters
@@ -172,6 +174,7 @@ def get_loss_weights(env: Environment[DataType]) -> torch.Tensor:
     """
     ts = torch.linspace(2e-2, 1, env.discretization_steps + 1, device=env.device)
     dt = ts[1] - ts[0]
+    # todo: fix access to scheduler
     sigmas = env.scheduler._sigma(ts).square().mean(dim=-1)
     cumsigmas = sigmas.flip(0).cumsum(0).flip(0) * dt
     weights: torch.Tensor = 1 / (1 + 0.5 * cumsigmas)

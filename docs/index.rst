@@ -18,13 +18,6 @@ In order to install *flowgym*, execute the following command:
 
    pip install flowgym
 
-If you want access to pre-trained image or molecular generation models, specify them as options:
-
-.. code-block:: bash
-
-   pip install flowgym[images]
-   pip install flowgym[molecules]
-
 High-level overview
 -------------------
 
@@ -32,9 +25,9 @@ Diffusion and flow models are largely agnostic to their data modality. They only
 underlying data type supports a small set of operations. Building on this idea, *flowgym* is
 designed to be fully modular. You only need to provide the following:
 
-- Data type that implements ``DataProtocol``, which defines basic arithmetic operations, factory methods, and gradient methods.
-- Base model ``BaseModel[DataType]``, which defines the scheduler, how to sample :math:`p_0`, how to compute the forward pass, and how to preprocess and postprocess data.
-- Reward function ``Reward[DataType]``.
+- Data type ``YourDataType`` that implements ``FlowProtocol``, which defines some functions necessary for interacting with it as a flow model.
+- Base model ``BaseModel[YourDataType]``, which defines the scheduler, how to sample :math:`p_0`, how to compute the forward pass, and how to preprocess and postprocess data.
+- Reward function ``Reward[YourDataType]``.
 
 Once these are defined, you can sample from the flow model and apply reward adaptation methods, such
 as Value Matching.
@@ -61,10 +54,5 @@ Table of contents
    api/schedulers
    api/rewards
    api/types
-
-.. toctree::
-   :caption: Optional
-   :titlesonly:
-
    api/images
    api/molecules

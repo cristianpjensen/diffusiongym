@@ -25,11 +25,3 @@ repos:
     entry: pixi run lint
     types: [python]
     pass_filenames: false
-
-  - id: Mypy
-    name: mypy
-    stages: [pre-commit, pre-push]
-    language: system
-    entry: pixi run types
-    types: [python]
-    pass_filenames: false

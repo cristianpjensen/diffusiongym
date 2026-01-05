@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Optional, cast
 import torch
 from diffusers.pipelines.ddpm.pipeline_ddpm import DDPMPipeline
 
-from flowgym import BaseModel, DiffusionScheduler, FGTensor
+from flowgym import BaseModel, DiffusionScheduler, FlowTensor
 from flowgym.registry import base_model_registry
 
 if TYPE_CHECKING:
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 @base_model_registry.register("images/cifar")
-class CIFARBaseModel(BaseModel[FGTensor]):
+class CIFARBaseModel(BaseModel[FlowTensor]):
     """Pre-trained diffusion model on CIFAR-10 32x32.
 
     Uses the `google/ddpm-cifar10-32` model from the `diffusers` library.
@@ -46,7 +46,7 @@ class CIFARBaseModel(BaseModel[FGTensor]):
         """Scheduler used for sampling."""
         return self._scheduler
 
-    def sample_p0(self, n: int, **kwargs: Any) -> tuple[FGTensor, dict[str, Any]]:
+    def sample_p0(self, n: int, **kwargs: Any) -> tuple[FlowTensor, dict[str, Any]]:
         """Sample n datapoints from the base distribution :math:`p_0`.
 
         Parameters
@@ -56,36 +56,36 @@ class CIFARBaseModel(BaseModel[FGTensor]):
 
         Returns
         -------
-        samples : FGTensor, shape (n, 3, 32, 32)
+        samples : FlowTensor, shape (n, 3, 32, 32)
             Samples from the base distribution :math:`p_0`.
 
         Notes
         -----
         The base distribution :math:`p_0` is a standard Gaussian distribution.
         """
-        return FGTensor(torch.randn(n, 3, 32, 32, device=self.device)), kwargs
+        return FlowTensor(torch.randn(n, 3, 32, 32, device=self.device)), kwargs
 
-    def postprocess(self, x: FGTensor) -> FGTensor:
+    def postprocess(self, x: FlowTensor) -> FlowTensor:
         """Convert to [0, 1].
 
         Parameters
         ----------
-        x : FGTensor, shape (n, 3, 32, 32)
+        x : FlowTensor, shape (n, 3, 32, 32)
             Final sample in [-1, 1].
 
         Returns
         -------
-        decoded : FGTensor, shape (n, 3, 32, 32)
+        decoded : FlowTensor, shape (n, 3, 32, 32)
             Final sample in [0, 1].
         """
-        return FGTensor(((x + 1) / 2).clamp(0, 1))
+        return FlowTensor(((x.data + 1) / 2).clamp(0, 1))
 
-    def forward(self, x: FGTensor, t: torch.Tensor, **kwargs: Any) -> FGTensor:
+    def forward(self, x: FlowTensor, t: torch.Tensor, **kwargs: Any) -> FlowTensor:
         r"""Forward pass of the model, outputting :math:`\epsilon(x_t, t)`.
 
         Parameters
         ----------
-        x : FGTensor, shape (n, 3, 32, 32)
+        x : FlowTensor, shape (n, 3, 32, 32)
             Input data.
 
         t : torch.Tensor, shape (n,)
@@ -96,9 +96,9 @@ class CIFARBaseModel(BaseModel[FGTensor]):
 
         Returns
         -------
-        output : FGTensor, shape (n, 3, 32, 32)
+        output : FlowTensor, shape (n, 3, 32, 32)
             Output of the model.
         """
         k = self.scheduler.model_input(t)
         output = cast("torch.Tensor", self.unet(x, k, **kwargs).sample)
-        return FGTensor(output)
+        return FlowTensor(output)

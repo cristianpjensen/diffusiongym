@@ -2,11 +2,35 @@
 name = "flowgym"
 description = "Flow Gym"
 license = {file = "LICENSE"}
-version = "1.0"
+version = "1.6"
 readme = "README.md"
 keywords = []
 authors = [{name = "Cristian Perez Jensen"}]
 requires-python = ">=3.8,<3.12"
+dependencies = [
+    "numpy>=1.24,<3",
+    "polars>=1.34.0,<2",
+    "torch==2.3.1",
+    "tqdm>=4.66,<5",
+    "typing-extensions>=4.9,<5",
+    "dgl==2.4",
+    "meeko==0.6.1",
+    "pandas>=2,<3",
+    "pydantic>=1.10,<3",
+    "prody>=2.4,<3",
+    "rdkit>=2023.9.4,<2025",
+    "rdkit-stubs>=0.6,<0.9",
+    "torchdata>=0.7,<0.9",
+    "pyyaml>=6,<7",
+    "diffusers==0.33.1",
+    "transformers>=4.36,<4.43",
+    "image-reward>=1.0,<2",
+    "clip @ git+https://github.com/openai/CLIP.git",
+    "open-clip-torch>=2.26,<3",
+    "peft==0.5.0",
+    "torchvision==0.18.1",
+    "flowmol @ git+https://github.com/cristianpjensen/FlowMol.git@a666676c2f3835fc410dede22eb41c5c7c4f2eb8",
+]
 
 [project.urls]
 Homepage = "https://github.com/cristianpjensen/flowgym"
@@ -16,12 +40,6 @@ Issues = "https://github.com/cristianpjensen/flowgym/issues"
 channels = ["conda-forge"]
 platforms = ["linux-64"]
 
-[tool.pixi.dependencies]
-tqdm = "*"
-types-tqdm = ">=4.67.0.20250809,<5"
-typing-extensions = "*"
-polars = ">=1.34.0,<2"
-
 [tool.pixi.pypi-options]
 extra-index-urls = ["https://download.pytorch.org/whl/cu121"]
 find-links = [
@@ -30,42 +48,20 @@ find-links = [
 ]
 
 [tool.pixi.pypi-dependencies]
-torch = { version = "==2.3.1", index = "https://download.pytorch.org/whl/cu121" }
-torchvision = { version = "==0.18.1", index = "https://download.pytorch.org/whl/cu121" }
 flowgym = { path = ".", editable = true }
 
 [tool.pixi.environments]
 default = { solve-group = "default" }
-molecules = { features = ["molecules"], solve-group = "default"}
-images = { features = ["images"], solve-group = "default"}
-all = { features = ["images", "molecules"], solve-group = "default" }
-dev = { features = ["dev", "molecules", "images"], solve-group = "default"}
+dev = { features = ["dev"], solve-group = "default"}
 
-[tool.pixi.feature.molecules.dependencies]
-rdkit = "==2023.9.4"
-prody = "*"
-
-[tool.pixi.feature.molecules.pypi-dependencies]
-dgl = "==2.4.0"
-flowmol = { git = "https://github.com/cristianpjensen/FlowMol.git", rev = "a666676c2f3835fc410dede22eb41c5c7c4f2eb8" }
-meeko = "==0.6.1"
-rdkit-stubs = "*"
-
-[tool.pixi.feature.molecules.activation]
+[tool.pixi.activation]
 env = { DGLBACKEND = "pytorch" }
-
-[tool.pixi.feature.images.pypi-dependencies]
-diffusers = "==0.33.1"
-transformers = "<4.43"
-image-reward = "*"
-clip = "*"
-open_clip_torch = "*"
 
 [tool.pixi.feature.dev.tasks]
 fmt = { cmd="ruff format flowgym value_matching" }
 lint = { cmd="ruff check flowgym value_matching --fix" }
 types = { cmd="mypy" }
-all = { depends-on = ["fmt", "lint", "types"] }
+all = { depends-on = ["fmt", "lint"] }
 docs = { cmd = "sphinx-build -b html docs docs/_build" }
 
 [tool.pixi.feature.dev.dependencies]
@@ -76,6 +72,7 @@ sphinx = ">=7.2.0,<7.3"
 sphinxawesome-theme = "*"
 sphinx-autobuild = ">=2024.10.3,<2025"
 myst-parser = ">=4.0.1,<5"
+roman = ">=4.1,<5"
 ipykernel = ">=6.30.1,<7"
 pip = ">=25.2,<26"
 
@@ -112,6 +109,8 @@ ignore = [
     "PLR1702", # Too many nested-blocks
     "D105", # Docstring in dunder methods
     "N812",
+    "D102",
+    "D101",
 ]
 
 [tool.ruff.lint.per-file-ignores]

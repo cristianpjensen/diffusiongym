@@ -1,4 +1,4 @@
-"""Optional image base models and rewards for Flow Gym."""
+"""Image base models and rewards for Flow Gym."""
 
 from .base_models.cifar import CIFARBaseModel
 from .base_models.dit import DiTBaseModel

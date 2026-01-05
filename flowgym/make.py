@@ -1,9 +1,10 @@
 """Factory function for creating flowgym environments."""
 
-from typing import TYPE_CHECKING, Any, Literal, Optional, overload
+from typing import Any, Optional
 
 import torch
 
+from flowgym.base_models import BaseModel
 from flowgym.environments import (
     EndpointEnvironment,
     Environment,
@@ -12,49 +13,8 @@ from flowgym.environments import (
     VelocityEnvironment,
 )
 from flowgym.registry import base_model_registry, reward_registry
-from flowgym.types import FGTensor
-
-if TYPE_CHECKING:
-    from flowgym.molecules.types import FGGraph
-
-
-# Overloads for image-based models
-@overload
-def make(
-    base_model: Literal["images/cifar", "images/sd2"],
-    reward: str,
-    discretization_steps: int,
-    reward_scale: float = 1.0,
-    device: Optional[torch.device | str] = None,
-    base_model_kwargs: Optional[dict[str, Any]] = None,
-    reward_kwargs: Optional[dict[str, Any]] = None,
-) -> Environment[FGTensor]: ...
-
-
-# Overload for molecule-based models
-@overload
-def make(
-    base_model: Literal["molecules/flowmol_qm9", "molecules/flowmol_geom"],
-    reward: str,
-    discretization_steps: int,
-    reward_scale: float = 1.0,
-    device: Optional[torch.device | str] = None,
-    base_model_kwargs: Optional[dict[str, Any]] = None,
-    reward_kwargs: Optional[dict[str, Any]] = None,
-) -> Environment["FGGraph"]: ...
-
-
-# General overload for any string
-@overload
-def make(
-    base_model: str,
-    reward: str,
-    discretization_steps: int,
-    reward_scale: float = 1.0,
-    device: Optional[torch.device | str] = None,
-    base_model_kwargs: Optional[dict[str, Any]] = None,
-    reward_kwargs: Optional[dict[str, Any]] = None,
-) -> Environment[Any]: ...
+from flowgym.rewards import Reward
+from flowgym.types import D
 
 
 def make(
@@ -136,9 +96,39 @@ def make(
     reward_entry = reward_registry.get(reward)
 
     # Instantiate base model and reward
-    base_model_instance = base_model_entry.instantiate(device=device, **base_model_kwargs)
-    reward_instance = reward_entry.instantiate(**reward_kwargs)
+    base_model_inst = base_model_entry.instantiate(device=device, **base_model_kwargs)
+    reward_inst = reward_entry.instantiate(**reward_kwargs)
 
+    return construct_env(base_model_inst, reward_inst, discretization_steps, reward_scale)
+
+
+def construct_env(
+    base_model: BaseModel[D],
+    reward: Reward[D],
+    discretization_steps: int,
+    reward_scale: float,
+) -> Environment[D]:
+    """Construct an environment, based on the base model's output type.
+
+    Parameters
+    ----------
+    base_model : BaseModel[D]
+        The base model to use.
+
+    reward : Reward[D]
+        The reward function to use.
+
+    discretization_steps : int
+        The number of discretization steps to use when sampling trajectories.
+
+    reward_scale : float
+        Scaling factor for the terminal reward function.
+
+    Returns
+    -------
+    env : Environment[D]
+        The created environment.
+    """
     # Create environment based on type
     env_classes: dict[str, type[Environment[Any]]] = {
         "epsilon": EpsilonEnvironment,
@@ -148,9 +138,9 @@ def make(
     }
 
     # Determine environment class from base model's output type
-    env_type = base_model_instance.output_type
+    env_type = base_model.output_type
     if env_type not in env_classes:
         raise ValueError(f"Any env_type: {env_type}. Available: {', '.join(env_classes.keys())}")
 
     env_class = env_classes[env_type]
-    return env_class(base_model_instance, reward_instance, discretization_steps, reward_scale)
+    return env_class(base_model, reward, discretization_steps, reward_scale)

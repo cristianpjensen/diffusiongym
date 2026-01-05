@@ -18,21 +18,13 @@ In order to install *flowgym*, execute the following command:
 pip install flowgym
 ```
 
-If you want access to pre-trained image or molecular generation models, specify them as options:
-```bash
-pip install flowgym[images]
-pip install flowgym[molecules]
-```
-
-If you want to run value matching on your environment, you will need to install it:
-```bash
-pip install value_matching
-```
+*flowgym* requires PyTorch 2.3.1, and there may be other hard dependencies. Please open an issue if
+installation fails through the above command.
 
 ## High-level overview
 
 Diffusion and flow models are largely agnostic to their data modality. They only require that the underlying data type supports a small set of operations. Building on this idea, *flowgym* is designed to be fully modular. You only need to provide the following:
- * Data type that implements `DataProtocol`, which defines basic arithmetic operations, factory methods, and gradient methods.
+ * Data type `YourDataType` that implements `FlowProtocol`, which defines some functions necessary for interacting with it as a flow model.
  * Base model `BaseModel[YourDataType]`, which defines the scheduler, how to sample $p_0$, how to compute the forward pass, and how to preprocess and postprocess data.
  * Reward function `Reward[YourDataType]`.
 

@@ -4,13 +4,13 @@ from typing import cast
 
 import torch
 
-from flowgym.types import FGTensor
+from flowgym.types import FlowTensor
 from flowgym.utils import append_dims
 
 from .base import Scheduler
 
 
-class OptimalTransportScheduler(Scheduler[FGTensor]):
+class OptimalTransportScheduler(Scheduler[FlowTensor]):
     r"""Optimal transport scheduler which is commonly used to train flow matching models.
 
     Schedule:
@@ -19,51 +19,37 @@ class OptimalTransportScheduler(Scheduler[FGTensor]):
         \alpha_t = t, \quad \beta_t = 1 - t, \quad \dot{\alpha}_t = 1, \quad \dot{\beta}_t = -1.
     """
 
-    def _alpha(self, t: torch.Tensor) -> torch.Tensor:
-        return t.unsqueeze(-1)
-
-    def alpha(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
+    def alpha(self, x: FlowTensor, t: torch.Tensor) -> FlowTensor:
         r""":math:`\alpha_t = t`."""
-        return FGTensor(append_dims(self._alpha(t), x.ndim))
+        return FlowTensor(append_dims(t, x.data.ndim))
 
-    def _alpha_dot(self, t: torch.Tensor) -> torch.Tensor:
-        return torch.ones_like(t).unsqueeze(-1)
-
-    def alpha_dot(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
+    def alpha_dot(self, x: FlowTensor, t: torch.Tensor) -> FlowTensor:
         r""":math:`\dot{\alpha}_t = 1`."""
-        return FGTensor(append_dims(self._alpha_dot(t), x.ndim))
+        return x.ones_like()
 
 
-class CosineScheduler(Scheduler[FGTensor]):
+class CosineScheduler(Scheduler[FlowTensor]):
     """Cosine scheduler."""
 
     def __init__(self, nu: float):
         self.nu = nu
 
-    def _alpha(self, t: torch.Tensor) -> torch.Tensor:
-        result: torch.Tensor = 1 - torch.cos((t**self.nu) * torch.pi / 2).square()
-        return result.unsqueeze(-1)
+    def alpha(self, x: FlowTensor, t: torch.Tensor) -> FlowTensor:
+        alpha = 1 - torch.cos((t**self.nu) * torch.pi / 2).square()
+        return FlowTensor(append_dims(alpha, x.data.ndim))
 
-    def alpha(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
-        r""":math:`\alpha_t`."""
-        return FGTensor(append_dims(self._alpha(t), x.ndim))
-
-    def _alpha_dot(self, t: torch.Tensor) -> torch.Tensor:
-        result: torch.Tensor = (
+    def alpha_dot(self, x: FlowTensor, t: torch.Tensor) -> FlowTensor:
+        alpha_dot = (
             self.nu
             * torch.pi
             * (t ** (self.nu - 1))
             * torch.sin((t**self.nu) * torch.pi / 2)
             * torch.cos((t**self.nu) * torch.pi / 2)
         )
-        return result.unsqueeze(-1)
-
-    def alpha_dot(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
-        r""":math:`\dot{\alpha}_t`."""
-        return FGTensor(append_dims(self._alpha_dot(t), x.ndim))
+        return FlowTensor(append_dims(alpha_dot, x.data.ndim))
 
 
-class DiffusionScheduler(Scheduler[FGTensor]):
+class DiffusionScheduler(Scheduler[FlowTensor]):
     """Scheduler for discrete-time diffusion models based on a given noise schedule.
 
     Parameters
@@ -91,34 +77,24 @@ class DiffusionScheduler(Scheduler[FGTensor]):
         """Input to the model at time t that encodes the timestep."""
         return self._get_index(t).to(t.device)
 
-    def _alpha(self, t: torch.Tensor) -> torch.Tensor:
+    def alpha(self, x: FlowTensor, t: torch.Tensor) -> FlowTensor:
         k = self._get_index(t)
-        return torch.sqrt(self.alpha_bar[k]).unsqueeze(-1)
+        alpha = torch.sqrt(self.alpha_bar[k])
+        return FlowTensor(append_dims(alpha, x.data.ndim))
 
-    def alpha(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
-        r""":math:`\alpha_t`."""
-        return FGTensor(append_dims(self._alpha(t), x.ndim))
-
-    def _beta(self, t: torch.Tensor) -> torch.Tensor:
+    def beta(self, x: FlowTensor, t: torch.Tensor) -> FlowTensor:
         k = self._get_index(t)
-        return torch.sqrt(1 - self.alpha_bar[k]).unsqueeze(-1)
+        beta = torch.sqrt(1 - self.alpha_bar[k])
+        return FlowTensor(append_dims(beta, x.data.ndim))
 
-    def beta(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
-        r""":math:`\beta_t`."""
-        return FGTensor(append_dims(self._beta(t), x.ndim))
-
-    def _alpha_dot(self, t: torch.Tensor) -> torch.Tensor:
+    def alpha_dot(self, x: FlowTensor, t: torch.Tensor) -> FlowTensor:
         k = self._get_index(t)
-        return 0.5 * self.alpha_bar_dot[k].unsqueeze(-1) / self._alpha(t)
+        alpha = torch.sqrt(self.alpha_bar[k])
+        alpha_dot = 0.5 * self.alpha_bar_dot[k] / alpha
+        return FlowTensor(append_dims(alpha_dot, x.data.ndim))
 
-    def alpha_dot(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
-        r""":math:`\dot{\alpha}_t`."""
-        return FGTensor(append_dims(self._alpha_dot(t), x.ndim))
-
-    def _beta_dot(self, t: torch.Tensor) -> torch.Tensor:
+    def beta_dot(self, x: FlowTensor, t: torch.Tensor) -> FlowTensor:
         k = self._get_index(t)
-        return -0.5 * self.alpha_bar_dot[k].unsqueeze(-1) / self._beta(t)
-
-    def beta_dot(self, x: FGTensor, t: torch.Tensor) -> FGTensor:
-        r""":math:`\dot{\beta}_t`."""
-        return FGTensor(append_dims(self._beta_dot(t), x.ndim))
+        beta = torch.sqrt(1 - self.alpha_bar[k])
+        beta_dot = -0.5 * self.alpha_bar_dot[k] / beta
+        return FlowTensor(append_dims(beta_dot, x.data.ndim))

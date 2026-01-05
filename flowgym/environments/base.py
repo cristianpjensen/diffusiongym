@@ -10,24 +10,24 @@ from tqdm.auto import tqdm
 from flowgym.base_models import BaseModel
 from flowgym.rewards import Reward
 from flowgym.schedulers import MemorylessNoiseSchedule, Scheduler
-from flowgym.types import DataType
+from flowgym.types import D
 
 
-class Policy(Protocol[DataType]):
+class Policy(Protocol[D]):
     """General protocol for a policy function."""
 
-    def __call__(self, x: DataType, t: torch.Tensor, **kwargs: Any) -> DataType: ...  # noqa: D102
+    def __call__(self, x: D, t: torch.Tensor, **kwargs: Any) -> D: ...
 
 
-class Environment(ABC, Generic[DataType]):
+class Environment(ABC, Generic[D]):
     """Abstract base class for all environments.
 
     Parameters
     ----------
-    base_model : BaseModel[DataType]
+    base_model : BaseModel[D]
         The base generative model used in the environment.
 
-    reward : Reward[DataType]
+    reward : Reward[D]
         The reward function used to compute the final reward.
 
     discretization_steps : int
@@ -36,8 +36,8 @@ class Environment(ABC, Generic[DataType]):
 
     def __init__(
         self,
-        base_model: BaseModel[DataType],
-        reward: Reward[DataType],
+        base_model: BaseModel[D],
+        reward: Reward[D],
         discretization_steps: int,
         reward_scale: float = 1.0,
     ):
@@ -45,8 +45,8 @@ class Environment(ABC, Generic[DataType]):
         self.reward = reward
         self.discretization_steps = discretization_steps
         self.reward_scale = reward_scale
-        self._policy: Optional[Policy[DataType]] = None
-        self._control_policy: Optional[Policy[DataType]] = None
+        self._policy: Optional[Policy[D]] = None
+        self._control_policy: Optional[Policy[D]] = None
         self.memoryless_schedule = MemorylessNoiseSchedule(self.scheduler)
 
     @property
@@ -55,12 +55,12 @@ class Environment(ABC, Generic[DataType]):
         return self.base_model.device
 
     @property
-    def scheduler(self) -> Scheduler[DataType]:
+    def scheduler(self) -> Scheduler[D]:
         """Get the scheduler of the base model."""
         return self.base_model.scheduler
 
     @property
-    def policy(self) -> Policy[DataType]:
+    def policy(self) -> Policy[D]:
         """Current policy (replacement of base model) of the environment."""
         if self._policy is None:
             return self.base_model
@@ -68,7 +68,7 @@ class Environment(ABC, Generic[DataType]):
         return self._policy
 
     @policy.setter
-    def policy(self, policy: Policy[DataType]) -> None:
+    def policy(self, policy: Policy[D]) -> None:
         """Set the current policy of the environment."""
         self._policy = policy
 
@@ -78,12 +78,12 @@ class Environment(ABC, Generic[DataType]):
         return self._policy is not None
 
     @property
-    def control_policy(self) -> Optional[Policy[DataType]]:
+    def control_policy(self) -> Optional[Policy[D]]:
         """Current control policy u(x, t) of the environment."""
         return self._control_policy
 
     @control_policy.setter
-    def control_policy(self, control_policy: Optional[Policy[DataType]]) -> None:
+    def control_policy(self, control_policy: Optional[Policy[D]]) -> None:
         """Set the current control policy of the environment."""
         self._control_policy = control_policy
 
@@ -95,15 +95,15 @@ class Environment(ABC, Generic[DataType]):
     @abstractmethod
     def pred_final(
         self,
-        x: DataType,
+        x: D,
         t: torch.Tensor,
         **kwargs: Any,
-    ) -> DataType:
+    ) -> D:
         """Compute the final state prediction from the current state.
 
         Parameters
         ----------
-        x : DataType
+        x : D
             The current state.
 
         t : torch.Tensor, shape (n,)
@@ -114,22 +114,22 @@ class Environment(ABC, Generic[DataType]):
 
         Returns
         -------
-        final : DataType
+        final : D
             The predicted final state from state x and time t.
         """
 
     @abstractmethod
     def drift(
         self,
-        x: DataType,
+        x: D,
         t: torch.Tensor,
         **kwargs: Any,
-    ) -> tuple[DataType, torch.Tensor]:
+    ) -> tuple[D, torch.Tensor]:
         """Compute the drift term of the environment's dynamics.
 
         Parameters
         ----------
-        x : DataType
+        x : D
             The current state.
 
         t : torch.Tensor, shape (n,)
@@ -140,19 +140,19 @@ class Environment(ABC, Generic[DataType]):
 
         Returns
         -------
-        drift : DataType
+        drift : D
             The drift term at state x and time t.
 
         running_cost : torch.Tensor, shape (n,)
             Running cost :math:`L(x_t, t)` of the policy for the given (state, timestep)-pair.
         """
 
-    def diffusion(self, x: DataType, t: torch.Tensor) -> DataType:
+    def diffusion(self, x: D, t: torch.Tensor) -> D:
         """Compute the diffusion term of the environment's dynamics.
 
         Parameters
         ----------
-        x : DataType
+        x : D
             The current state.
 
         t : torch.Tensor, shape (n,)
@@ -160,7 +160,7 @@ class Environment(ABC, Generic[DataType]):
 
         Returns
         -------
-        diffusion : DataType
+        diffusion : D
             The diffusion term at time t.
         """
         return self.scheduler.sigma(x, t)
@@ -170,12 +170,13 @@ class Environment(ABC, Generic[DataType]):
         self,
         n: int,
         pbar: bool = True,
+        x0: Optional[D] = None,
         **kwargs: Any,
     ) -> tuple[
-        DataType,
-        list[DataType],
-        list[DataType],
-        list[DataType],
+        D,
+        list[D],
+        list[D],
+        list[D],
         torch.Tensor,
         torch.Tensor,
         torch.Tensor,
@@ -192,22 +193,25 @@ class Environment(ABC, Generic[DataType]):
         pbar : bool, default: True
             Whether to display a progress bar.
 
+        x0 : D, optional
+            Initial states to start the trajectories from. If None, samples from :math:`p_0`.
+
         **kwargs : dict
             Additional keyword arguments to pass to the base model at every timestep (e.g. text
             embedding or class label).
 
         Returns
         -------
-        sample : DataType
+        sample : D
             The final states :math:`x_1` of the sampled trajectory.
 
-        trajectories : list of DataType, length discretization_steps+1
+        trajectories : list of D, length discretization_steps+1
             The sampled trajectories, containing x_t.
 
-        drifts : list of DataType, length discretization_steps
+        drifts : list of D, length discretization_steps
             The drift terms at each timestep.
 
-        noises : list of DataType, length discretization_steps
+        noises : list of D, length discretization_steps
             The noise terms at each timestep.
 
         running_costs : torch.Tensor, shape (discretization_steps, n)
@@ -227,9 +231,14 @@ class Environment(ABC, Generic[DataType]):
             Additional keyword arguments passed to the base model at every timestep.
         """
         x, kwargs = self.base_model.sample_p0(n, **kwargs)
+
+        # Set initial state if provided
+        if x0 is not None:
+            x = x0.to(self.base_model.device)
+
         x, kwargs = self.base_model.preprocess(x, **kwargs)
 
-        trajectories = [x.to_device("cpu")]
+        trajectories = [x.to("cpu")]
         drifts = []
         noises = []
         running_costs = torch.zeros(self.discretization_steps, n)
@@ -251,9 +260,9 @@ class Environment(ABC, Generic[DataType]):
             x += dt * drift + torch.sqrt(dt) * diffusion * epsilon
 
             running_costs[i] = running_cost
-            trajectories.append(x.to_device("cpu"))
-            drifts.append(drift.to_device("cpu"))
-            noises.append(epsilon.to_device("cpu"))
+            trajectories.append(x.to("cpu"))
+            drifts.append(drift.to("cpu"))
+            noises.append(epsilon.to("cpu"))
 
         x = self.base_model.postprocess(x)
 

@@ -9,7 +9,7 @@ Data type
 ---------
 
 For images, we can simply use tensors as the datatype. *flowgym* already has a wrapper for this in
-``FGTensor``. See :ref:`flowgym/types.py` for implementation details.
+``FlowTensor``. See :ref:`flowgym/types.py` for implementation details.
 
 Scheduler
 ---------
@@ -54,10 +54,10 @@ obtain the base model through their API:
 .. code-block:: python
 
    from diffusers import StableDiffusionPipeline
-   from flowgym import BaseModel, FGTensor, base_model_registry
+   from flowgym import BaseModel, FlowTensor, base_model_registry
 
    @base_model_registry.register("images/stable_diffusion")
-   class StableDiffusionBaseModel(BaseModel[FGTensor]):
+   class StableDiffusionBaseModel(BaseModel[FlowTensor]):
       output_type = "epsilon"
 
       def __init__(self, device):
@@ -100,7 +100,7 @@ dataset.
       if isinstance(prompt, str):
          prompt = [prompt] * n
 
-      return FGTensor(latents), { "prompt": prompt }
+      return FlowTensor(latents), { "prompt": prompt }
 
 Preprocessing
 ^^^^^^^^^^^^^
@@ -110,7 +110,7 @@ In order for the U-net base model to make predictions, we need to encode the pro
 .. code-block:: python
 
    # In StableDiffusionBaseModel
-   def preprocess(self, x: FGTensor, **kwargs):
+   def preprocess(self, x: FlowTensor, **kwargs):
       prompt_embeds, _ = self.pipe.encode_prompt(prompt, self.device, 1, False)
       return x, { "encoder_hidden_states": prompt_embeds }
 
@@ -123,10 +123,10 @@ U-net model, which predicts the noise:
 .. code-block:: python
 
    # In StableDiffusionBaseModel
-   def forward(self, x: FGTensor, t: torch.Tensor, **kwargs):
-      x_tensor = x.as_subclass(torch.Tensor)
+   def forward(self, x: FlowTensor, t: torch.Tensor, **kwargs):
+      y = x.data
       k = self.scheduler.model_input(t)
-      return FGTensor(self.pipe.unet(x_tensor, k, kwargs["encoder_hidden_states"]).sample)
+      return FlowTensor(self.pipe.unet(y, k, kwargs["encoder_hidden_states"]).sample)
 
 This can additionally be altered by adding classifier-free guidance, as in
 :ref:`flowgym/images/base_models/stable_diffusion.py`.
@@ -139,12 +139,12 @@ Lastly, we need to decode the latents back into images through the VAE decoder:
 .. code-block:: python
 
    # In StableDiffusionBaseModel
-   def postprocess(self, x: FGTensor, **kwargs):
-      x = x / self.pipe.vae.config.scaling_factor
-      images = self.pipe.vae.decode(x).sample
+   def postprocess(self, x: FlowTensor, **kwargs):
+      y = x.data / self.pipe.vae.config.scaling_factor
+      images = self.pipe.vae.decode(y).sample
       images = (images + 1) / 2
       images = images.clamp(0, 1)
-      return FGTensor(images)
+      return FlowTensor(images)
 
 Reward function
 ---------------
@@ -155,12 +155,12 @@ are valid, we output all ones for the second return value:
 
 .. code-block:: python
 
-   from flowgym import Reward, FGTensor
+   from flowgym import Reward, FlowTensor
 
    @reward_registry.register("images/red")
-   class RednessReward(Reward[FGTensor]):
-      def forward(self, x: FGTensor, **kwargs):
-         red_channel = x[:, 0, :, :]
+   class RednessReward(Reward[FlowTensor]):
+      def forward(self, x: FlowTensor, **kwargs):
+         red_channel = x.data[:, 0, :, :]
          return red_channel.mean(dim=(1, 2)).cpu(), torch.ones(x.shape[0])
 
 Environment

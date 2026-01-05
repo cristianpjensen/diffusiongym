@@ -4,12 +4,12 @@ from typing import Any
 
 import torch
 
-from flowgym.types import DataType
+from flowgym.types import D
 
 from .base import Environment
 
 
-class ScoreEnvironment(Environment[DataType]):
+class ScoreEnvironment(Environment[D]):
     r"""Environment with tensor samples and base model predict score :math:`\nabla \log p_t(x)`.
 
     Parameters
@@ -24,17 +24,12 @@ class ScoreEnvironment(Environment[DataType]):
         The number of discretization steps to use when sampling trajectories.
     """
 
-    def pred_final(
-        self,
-        x: DataType,
-        t: torch.Tensor,
-        **kwargs: Any,
-    ) -> DataType:
+    def pred_final(self, x: D, t: torch.Tensor, **kwargs: Any) -> D:
         """Compute the final state prediction from the current state.
 
         Parameters
         ----------
-        x : DataType
+        x : D
             The current state.
 
         t : torch.Tensor, shape (n,)
@@ -45,7 +40,7 @@ class ScoreEnvironment(Environment[DataType]):
 
         Returns
         -------
-        final : DataType
+        final : D
             The predicted final state from state x and time t.
         """
         alpha = self.scheduler.alpha(x, t)
@@ -53,17 +48,12 @@ class ScoreEnvironment(Environment[DataType]):
         score = self.policy(x, t, **kwargs)
         return x / alpha + ((beta**2) / alpha) * score
 
-    def drift(
-        self,
-        x: DataType,
-        t: torch.Tensor,
-        **kwargs: Any,
-    ) -> tuple[DataType, torch.Tensor]:
+    def drift(self, x: D, t: torch.Tensor, **kwargs: Any) -> tuple[D, torch.Tensor]:
         """Compute the drift term of the environment's dynamics.
 
         Parameters
         ----------
-        x : DataType
+        x : D
             The current state.
 
         t : torch.Tensor, shape (n,)
@@ -75,7 +65,7 @@ class ScoreEnvironment(Environment[DataType]):
 
         Returns
         -------
-        drift : DataType
+        drift : D
             The drift term at state x and time t.
 
         running_cost : torch.Tensor, shape (n,)
@@ -101,4 +91,4 @@ class ScoreEnvironment(Environment[DataType]):
             control += control_add
             action += (sigma_ft / b) * control_add
 
-        return a * x + b * action, 0.5 * (control * control).batch_sum()
+        return a * x + b * action, 0.5 * (control * control).aggregate()

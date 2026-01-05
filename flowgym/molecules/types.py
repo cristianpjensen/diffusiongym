@@ -1,13 +1,38 @@
 """Types for molecular graphs in Flow Gym."""
 
-from typing import Any, Callable, Union
+from typing import Any, Optional, Sequence, Union
 
 import dgl
 import torch
-from torch_scatter import scatter
+from typing_extensions import Self
+
+from flowgym.types import BinaryOp, FlowMixin, UnaryOp
 
 
-class FGGraph:
+def construct_ue_mask(g: dgl.DGLGraph) -> torch.Tensor:
+    """Construct a mask indicating upper edges in the graph."""
+    ul_pattern = torch.tensor([1, 0], device=g.device).repeat(g.batch_size)
+    n_edges_pattern = (g.batch_num_edges() / 2).int().repeat_interleave(2)
+    return ul_pattern.repeat_interleave(n_edges_pattern).bool()
+
+
+def construct_n_idx(g: dgl.DGLGraph) -> torch.Tensor:
+    """Construct a tensor which maps each node to its graph index in the batch."""
+    return torch.repeat_interleave(
+        torch.arange(g.batch_size, device=g.device),
+        g.batch_num_nodes(),
+    )
+
+
+def construct_e_idx(g: dgl.DGLGraph) -> torch.Tensor:
+    """Construct a tensor which maps each edge to its graph index in the batch."""
+    return torch.repeat_interleave(
+        torch.arange(g.batch_size, device=g.device),
+        g.batch_num_edges(),
+    )
+
+
+class FlowGraph(FlowMixin):
     """A wrapper around DGLGraph that supports required factory methods.
 
     Parameters
@@ -15,27 +40,42 @@ class FGGraph:
     graph : dgl.DGLGraph
         The graph to wrap.
 
-    ue_mask : torch.Tensor, shape (num_edges,)
-        Mask indicating upper edges in the graph.
+    ue_mask : Optional[torch.Tensor], optional
+        Mask indicating upper edges in the graph, by default None
 
-    n_idx : torch.Tensor, shape (num_nodes,)
-        Batch indices for nodes.
+    n_idx : Optional[torch.Tensor], optional
+        Tensor mapping each node to its graph index in the batch, by default None
 
-    e_idx : torch.Tensor, shape (num_edges,)
-        Batch indices for edges.
+    e_idx : Optional[torch.Tensor], optional
+        Tensor mapping each edge to its graph index in the batch, by default None
     """
 
     def __init__(
         self,
         graph: dgl.DGLGraph,
-        ue_mask: torch.Tensor,
-        n_idx: torch.Tensor,
-        e_idx: torch.Tensor,
+        ue_mask: Optional[torch.Tensor] = None,
+        n_idx: Optional[torch.Tensor] = None,
+        e_idx: Optional[torch.Tensor] = None,
     ):
+        if ue_mask is None:
+            ue_mask = construct_ue_mask(graph)
+        if n_idx is None:
+            n_idx = construct_n_idx(graph)
+        if e_idx is None:
+            e_idx = construct_e_idx(graph)
+
         self.graph = graph
         self.ue_mask = ue_mask
         self.n_idx = n_idx
         self.e_idx = e_idx
+
+    def __repr__(self) -> str:
+        return (
+            f"{type(self).__name__}("
+            f"num_nodes={self.graph.num_nodes()}, "
+            f"num_edges={self.graph.num_edges()}, "
+            f"batch_size={len(self)})"
+        )
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self.graph, name)
@@ -47,8 +87,36 @@ class FGGraph:
             setattr(self.graph, name, value)
 
     def __len__(self) -> int:
-        """Get the batch size."""
-        return self.graph.batch_size  # type: ignore
+        return int(self.graph.batch_size)
+
+    def __getitem__(self, idx: Union[int, slice]) -> Self:
+        if isinstance(idx, int):
+            # Faster to use slice_batch if we only want one item
+            if idx < 0:
+                idx += len(self)
+
+            if idx < 0 or idx >= len(self):
+                raise IndexError(f"Index {idx} out of range for batch size {len(self)}")
+
+            return type(self)(dgl.slice_batch(self.graph, idx))
+
+        if isinstance(idx, slice):
+            graphs = dgl.unbatch(self.graph)
+            selected_graphs = graphs[idx]
+
+            if not selected_graphs:
+                raise ValueError("The slice resulted in an empty graph sequence.")
+
+            return type(self)(dgl.batch(selected_graphs))
+
+        raise TypeError(f"Invalid index type: {type(idx)}")
+
+    @classmethod
+    def collate(cls, items: Sequence[Self]) -> Self:
+        if not items:
+            raise ValueError("Cannot collate an empty sequence")
+
+        return cls(dgl.batch([item.graph for item in items]))
 
     def _get_empty_graph(self) -> dgl.DGLGraph:
         """Get an empty graph with the same structure as Self."""
@@ -62,19 +130,7 @@ class FGGraph:
 
         return empty_graph
 
-    def _apply_unary_op(self, op: Callable[[torch.Tensor], torch.Tensor]) -> "FGGraph":
-        """Apply a unary operation to graph data.
-
-        Parameters
-        ----------
-        op : (torch.Tensor) -> torch.Tensor
-            Unary operation to apply.
-
-        Returns
-        -------
-        output : FGGraph
-            New graph with operation applied.
-        """
+    def apply(self, op: UnaryOp) -> Self:
         res = self._get_empty_graph()
 
         for key, val in self.graph.ndata.items():
@@ -85,180 +141,48 @@ class FGGraph:
             if isinstance(val, torch.Tensor):
                 res.edata[key] = op(val)
 
-        return FGGraph(res, self.ue_mask, self.n_idx, self.e_idx)
+        return type(self)(res, self.ue_mask, self.n_idx, self.e_idx)
 
-    def _apply_binary_op(
-        self,
-        other: Union["FGGraph", float, torch.Tensor],
-        op: Callable[[Any, Any], Any],
-    ) -> "FGGraph":
-        """Apply a binary operation to graph data.
-
-        Parameters
-        ----------
-        other : FGGraph, float, or torch.Tensor
-            The other operand.
-
-        op : (any, any) -> any
-            Binary operation to apply.
-
-        Returns
-        -------
-        output : FGGraph
-            New graph with operation applied.
-        """
+    def combine(self, other: Union[Self, float, torch.Tensor], op: BinaryOp) -> Self:
         res = self._get_empty_graph()
 
-        if isinstance(other, FGGraph):
+        if isinstance(other, FlowGraph):
             for key, val in self.graph.ndata.items():
                 if key in other.graph.ndata:
-                    res.ndata[key] = op(val, other.graph.ndata[key])
+                    res.ndata[key] = op(val, other.graph.ndata[key])  # type: ignore
                 else:
                     res.ndata[key] = val
 
             for key, val in self.graph.edata.items():
                 if key in other.graph.edata:
-                    res.edata[key] = op(val, other.graph.edata[key])
+                    res.edata[key] = op(val, other.graph.edata[key])  # type: ignore
                 else:
                     res.edata[key] = val
         else:
             for key, val in self.graph.ndata.items():
-                res.ndata[key] = op(val, other)
+                res.ndata[key] = op(val, other)  # type: ignore
 
             for key, val in self.graph.edata.items():
-                res.edata[key] = op(val, other)
+                res.edata[key] = op(val, other)  # type: ignore
 
-        return FGGraph(res, self.ue_mask, self.n_idx, self.e_idx)
+        return type(self)(res, self.ue_mask, self.n_idx, self.e_idx)
 
-    def __add__(self, other: Union["FGGraph", float, torch.Tensor]) -> "FGGraph":
-        return self._apply_binary_op(other, lambda a, b: a + b)
-
-    def __sub__(self, other: Union["FGGraph", float, torch.Tensor]) -> "FGGraph":
-        return self._apply_binary_op(other, lambda a, b: a - b)
-
-    def __mul__(self, other: Union["FGGraph", float, torch.Tensor]) -> "FGGraph":
-        return self._apply_binary_op(other, lambda a, b: a * b)
-
-    def __truediv__(self, other: Union["FGGraph", float, torch.Tensor]) -> "FGGraph":
-        return self._apply_binary_op(other, lambda a, b: a / b)
-
-    def __radd__(self, other: Union["FGGraph", float, torch.Tensor]) -> "FGGraph":
-        return self._apply_binary_op(other, lambda a, b: b + a)
-
-    def __rsub__(self, other: Union["FGGraph", float, torch.Tensor]) -> "FGGraph":
-        return self._apply_binary_op(other, lambda a, b: b - a)
-
-    def __rmul__(self, other: Union["FGGraph", float, torch.Tensor]) -> "FGGraph":
-        return self._apply_binary_op(other, lambda a, b: b * a)
-
-    def __pow__(self, power: float) -> "FGGraph":
-        return self._apply_binary_op(power, lambda a, b: a**b)
-
-    def __neg__(self) -> "FGGraph":
-        return self._apply_unary_op(lambda x: -x)
-
-    def randn_like(self) -> "FGGraph":
-        """Generate random normal noise with the same shape and type as self."""
-        return self._apply_unary_op(torch.randn_like)
-
-    def ones_like(self) -> "FGGraph":
-        """Generate ones with the same shape and type as self."""
-        return self._apply_unary_op(torch.ones_like)
-
-    def zeros_like(self) -> "FGGraph":
-        """Generate zeros with the same shape and type as self."""
-        return self._apply_unary_op(torch.zeros_like)
-
-    def batch_sum(self) -> torch.Tensor:
-        """Sum over all dimensions except the first (batch) dimension.
-
-        Returns
-        -------
-        sum : torch.Tensor, shape (batch_size,)
-        """
+    def aggregate(self) -> torch.Tensor:
         summed = torch.zeros(self.graph.batch_size, device=self.graph.device)
         for _, val in self.graph.ndata.items():
             if isinstance(val, torch.Tensor):
-                summed += scatter(val, self.n_idx, dim=0, reduce="sum").sum(dim=-1)
+                aggregated = torch.zeros(
+                    self.graph.batch_size, *val.shape[1:], device=val.device, dtype=val.dtype
+                )
+                aggregated.index_add_(0, self.n_idx, val)
+                summed += aggregated.sum(dim=-1)
 
         for _, val in self.graph.edata.items():
             if isinstance(val, torch.Tensor):
-                summed += scatter(val, self.e_idx, dim=0, reduce="sum").sum(dim=-1)
+                aggregated = torch.zeros(
+                    self.graph.batch_size, *val.shape[1:], device=val.device, dtype=val.dtype
+                )
+                aggregated.index_add_(0, self.e_idx, val)
+                summed += aggregated.sum(dim=-1)
 
         return summed
-
-    def to_device(self, device: torch.device | str) -> "FGGraph":
-        """Move the graph to the specified device.
-
-        Returns
-        -------
-        output : FGGraph
-            A copy of self on the specified device.
-        """
-        return FGGraph(
-            self.graph.to(device),
-            self.ue_mask.to(device),
-            self.n_idx.to(device),
-            self.e_idx.to(device),
-        )
-
-    def with_requires_grad(self) -> "FGGraph":
-        """Enable gradient tracking for all tensors in the graph.
-
-        Returns
-        -------
-        output : FGGraph
-            New graph with requires_grad=True for all tensors.
-        """
-        res = self._get_empty_graph()
-
-        for key, val in self.graph.ndata.items():
-            if isinstance(val, torch.Tensor):
-                res.ndata[key] = val.requires_grad_(True)
-            else:
-                res.ndata[key] = val
-
-        for key, val in self.graph.edata.items():
-            if isinstance(val, torch.Tensor):
-                res.edata[key] = val.requires_grad_(True)
-            else:
-                res.edata[key] = val
-
-        return FGGraph(res, self.ue_mask, self.n_idx, self.e_idx)
-
-    def gradient(self, x: torch.Tensor) -> "FGGraph":
-        """Compute gradients of x with respect to all tensors in the graph.
-
-        Parameters
-        ----------
-        x : torch.Tensor
-            The tensor to compute gradients from (typically a loss or output).
-
-        Returns
-        -------
-        output : FGGraph
-            New graph containing gradients of x with respect to each tensor.
-        """
-        res = self._get_empty_graph()
-
-        for n_feat, val in self.graph.ndata.items():
-            if isinstance(val, torch.Tensor):
-                grad = torch.autograd.grad(
-                    x, val, grad_outputs=torch.ones_like(x), retain_graph=True
-                )[0]
-                if grad is None:
-                    grad = torch.zeros_like(val)
-
-                res.ndata[n_feat] = grad
-
-        for e_feat, val in self.graph.edata.items():
-            if isinstance(val, torch.Tensor):
-                grad = torch.autograd.grad(
-                    x, val, grad_outputs=torch.ones_like(x), retain_graph=True
-                )[0]
-                if grad is None:
-                    grad = torch.zeros_like(val)
-
-                res.edata[e_feat] = grad
-
-        return FGGraph(res, self.ue_mask, self.n_idx, self.e_idx)

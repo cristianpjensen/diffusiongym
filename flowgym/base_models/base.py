@@ -7,12 +7,12 @@ import torch
 from torch import nn
 
 from flowgym.schedulers import Scheduler
-from flowgym.types import DataType
+from flowgym.types import D
 
 OutputType = Literal["epsilon", "endpoint", "velocity", "score"]
 
 
-class BaseModel(ABC, nn.Module, Generic[DataType]):
+class BaseModel(ABC, nn.Module, Generic[D]):
     """Abstract base class for base models used in flow matching and diffusion."""
 
     output_type: OutputType
@@ -27,11 +27,11 @@ class BaseModel(ABC, nn.Module, Generic[DataType]):
 
     @property
     @abstractmethod
-    def scheduler(self) -> Scheduler[DataType]:
+    def scheduler(self) -> Scheduler[D]:
         """Base model-dependent scheduler used for sampling."""
 
     @abstractmethod
-    def sample_p0(self, n: int) -> tuple[DataType, dict[str, Any]]:
+    def sample_p0(self, n: int, **kwargs: Any) -> tuple[D, dict[str, Any]]:
         """Sample n data points from the base distribution p0.
 
         Parameters
@@ -39,9 +39,12 @@ class BaseModel(ABC, nn.Module, Generic[DataType]):
         n : int
             Number of samples to draw.
 
+        **kwargs : dict
+            Additional keyword arguments.
+
         Returns
         -------
-        samples : DataType
+        samples : D
             Samples from the base distribution p0.
 
         kwargs : dict
@@ -49,12 +52,12 @@ class BaseModel(ABC, nn.Module, Generic[DataType]):
         """
 
     @abstractmethod
-    def forward(self, x: DataType, t: torch.Tensor, **kwargs: Any) -> DataType:
+    def forward(self, x: D, t: torch.Tensor, **kwargs: Any) -> D:
         """Forward pass of the base model.
 
         Parameters
         ----------
-        x : DataType
+        x : D
             Input data.
 
         t : torch.Tensor, shape (n,)
@@ -62,16 +65,16 @@ class BaseModel(ABC, nn.Module, Generic[DataType]):
 
         Returns
         -------
-        output : DataType
+        output : D
             Output of the model.
         """
 
-    def preprocess(self, x: DataType, **kwargs: Any) -> tuple[DataType, dict[str, Any]]:
+    def preprocess(self, x: D, **kwargs: Any) -> tuple[D, dict[str, Any]]:
         """Preprocess data and keyword arguments for the base model.
 
         Parameters
         ----------
-        x : DataType
+        x : D
             Input data to preprocess.
 
         **kwargs : dict
@@ -79,7 +82,7 @@ class BaseModel(ABC, nn.Module, Generic[DataType]):
 
         Returns
         -------
-        output : DataType
+        output : D
             Preprocessed data.
 
         kwargs : dict
@@ -87,17 +90,17 @@ class BaseModel(ABC, nn.Module, Generic[DataType]):
         """
         return x, kwargs
 
-    def postprocess(self, x: DataType) -> DataType:
+    def postprocess(self, x: D) -> D:
         """Postprocess samples x_1 (e.g., decode with VAE).
 
         Parameters
         ----------
-        x : DataType
+        x : D
             Input data to postprocess.
 
         Returns
         -------
-        output : DataType
+        output : D
             Postprocessed output.
         """
         return x

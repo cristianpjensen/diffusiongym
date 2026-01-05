@@ -1,0 +1,7 @@
+Version 1.6
+-----------
+
+- Made it much easier to add new data types by shortening the number of methods required to implement.
+- Added functionality for indexing and collating data type.
+- Added a general training function `train_base_model`.
+- Dependencies should be easier to manage now.

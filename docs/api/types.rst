@@ -8,6 +8,7 @@ Types
     :template: class.rst
     :nosignatures:
 
-    DataProtocol
-    DataType
-    FGTensor
+    FlowProtocol
+    FlowMixin
+    D
+    FlowTensor

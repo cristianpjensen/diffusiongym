@@ -5,12 +5,12 @@ from typing import Any, Optional, cast
 import torch
 from diffusers.pipelines.dit.pipeline_dit import DiTPipeline
 
-from flowgym import BaseModel, DiffusionScheduler, FGTensor
+from flowgym import BaseModel, DiffusionScheduler, FlowTensor
 from flowgym.registry import base_model_registry
 
 
 @base_model_registry.register("images/dit")
-class DiTBaseModel(BaseModel[FGTensor]):
+class DiTBaseModel(BaseModel[FlowTensor]):
     """Pre-trained 256x256 ImageNet transformer diffusion model.
 
     Uses the `facebookresearch/DiT-XL-2-256` model from the `diffusers` library.
@@ -38,7 +38,7 @@ class DiTBaseModel(BaseModel[FGTensor]):
         """Scheduler used for sampling."""
         return self._scheduler
 
-    def sample_p0(self, n: int, **kwargs: Any) -> tuple[FGTensor, dict[str, Any]]:
+    def sample_p0(self, n: int, **kwargs: Any) -> tuple[FlowTensor, dict[str, Any]]:
         """Sample n latent datapoints from the base distribution :math:`p_0`.
 
         Parameters
@@ -51,7 +51,7 @@ class DiTBaseModel(BaseModel[FGTensor]):
 
         Returns
         -------
-        samples : FGTensor, shape (n, 4, 64, 64)
+        samples : FlowTensor, shape (n, 4, 64, 64)
             Samples from the base distribution :math:`p_0`.
 
         kwargs : dict
@@ -82,16 +82,16 @@ class DiTBaseModel(BaseModel[FGTensor]):
             )
 
         return (
-            FGTensor(torch.randn(n, self.channels, self.dim, self.dim, device=self.device)),
+            FlowTensor(torch.randn(n, self.channels, self.dim, self.dim, device=self.device)),
             {"class_labels": class_labels, "cfg_scale": cfg_scale},
         )
 
-    def preprocess(self, x: FGTensor, **kwargs: Any) -> tuple[FGTensor, dict[str, Any]]:
+    def preprocess(self, x: FlowTensor, **kwargs: Any) -> tuple[FlowTensor, dict[str, Any]]:
         """Encode the prompt (if provided instead of encoder_hidden_states).
 
         Parameters
         ----------
-        x : FGTensor, shape (n, 4, 64, 64)
+        x : FlowTensor, shape (n, 4, 64, 64)
             Input data to preprocess.
 
         **kwargs : dict
@@ -116,35 +116,35 @@ class DiTBaseModel(BaseModel[FGTensor]):
             "class_labels": class_labels,
         }
 
-    def postprocess(self, x: FGTensor) -> FGTensor:
+    def postprocess(self, x: FlowTensor) -> FlowTensor:
         """Decode the images from the latent space.
 
         Parameters
         ----------
-        x : FGTensor, shape (n, 4, 64, 64)
+        x : FlowTensor, shape (n, 4, 64, 64)
             Final sample in latent space.
 
         Returns
         -------
-        decoded : FGTensor, shape (n, 3, 512, 512)
+        decoded : FlowTensor, shape (n, 3, 512, 512)
             Decoded images in pixel space.
         """
         # Do this one-by-one to save on a lot of VRAM
         x = x / self.pipe.vae.config.scaling_factor
-        decoded = torch.cat([self.pipe.vae.decode(xi.unsqueeze(0)).sample for xi in x], dim=0)
+        decoded = torch.cat([self.pipe.vae.decode(xi.unsqueeze(0)).sample for xi in x.data], dim=0)
 
         # Convert to [0, 1]
         decoded = (decoded + 1) / 2
         decoded = decoded.clamp(0, 1)
 
-        return FGTensor(decoded)
+        return FlowTensor(decoded)
 
-    def forward(self, x: FGTensor, t: torch.Tensor, **kwargs: Any) -> FGTensor:
+    def forward(self, x: FlowTensor, t: torch.Tensor, **kwargs: Any) -> FlowTensor:
         r"""Forward pass of the model, outputting :math:`\epsilon(x_t, t)`.
 
         Parameters
         ----------
-        x : FGTensor, shape (n, 4, 64, 64)
+        x : FlowTensor, shape (n, 4, 64, 64)
             Input data.
 
         t : torch.Tensor, shape (n,)
@@ -155,10 +155,10 @@ class DiTBaseModel(BaseModel[FGTensor]):
 
         Returns
         -------
-        output : FGTensor, shape (n, 4, 64, 64)
+        output : FlowTensor, shape (n, 4, 64, 64)
             Output of the model.
         """
-        x_tensor = x.as_subclass(torch.Tensor)
+        x_tensor = x.data
         k = self.scheduler.model_input(t)
 
         cfg_scale = kwargs.get("cfg_scale", 0.0)
@@ -174,7 +174,7 @@ class DiTBaseModel(BaseModel[FGTensor]):
 
         if not use_cfg:
             out = cast("torch.Tensor", self.transformer(x_tensor, k, class_labels).sample[:, :4])
-            return FGTensor(out)
+            return FlowTensor(out)
 
         x_tensor = torch.cat([x_tensor, x_tensor], dim=0)
         k = torch.cat([k, k], dim=0)
@@ -186,4 +186,4 @@ class DiTBaseModel(BaseModel[FGTensor]):
         cond, uncond = out[:, :4].chunk(2)
         out = (cfg_scale + 1) * cond - cfg_scale * uncond
 
-        return FGTensor(out)
+        return FlowTensor(out)

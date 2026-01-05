@@ -1,178 +1,209 @@
 """Custom types for flowgym."""
 
-from typing import Protocol, TypeVar, Union
+from typing import Callable, Protocol, Sequence, TypeVar, Union
 
 import torch
 from typing_extensions import Self
 
+UnaryOp = Callable[[torch.Tensor], torch.Tensor]
+BinaryOp = Callable[[torch.Tensor, torch.Tensor], torch.Tensor]
+D = TypeVar("D", bound="FlowMixin")
 
-class DataProtocol(Protocol):
-    """Protocol defining the required interface for data types in flowgym.
 
-    Types implementing this protocol must support arithmetic operations, factory methods
-    (randn_like, ones_like, zeros_like), and batch reduction operations (batch_sum).
-    """
+class FlowProtocol(Protocol):
+    def __len__(self) -> int: ...
+    def __getitem__(self, idx: Union[int, slice]) -> Self: ...
 
-    def __len__(self) -> int:
-        """Get the batch size (length of the first dimension)."""
+    @classmethod
+    def collate(cls: type[Self], items: Sequence[Self]) -> Self: ...
+
+    def aggregate(self) -> torch.Tensor:
+        """Reduce over all dimensions except batch (i.e., sum per sample).
+
+        Returns: Tensor of shape (len(self),)
+        """
         ...
 
-    def __add__(self, other: Union[Self, float, torch.Tensor]) -> Self: ...
-    def __sub__(self, other: Union[Self, float, torch.Tensor]) -> Self: ...
-    def __mul__(self, other: Union[Self, float, torch.Tensor]) -> Self: ...
-    def __truediv__(self, other: Union[Self, float, torch.Tensor]) -> Self: ...
-    def __neg__(self) -> Self: ...
-    def __radd__(self, other: Union[Self, float, torch.Tensor]) -> Self: ...
-    def __rsub__(self, other: Union[Self, float, torch.Tensor]) -> Self: ...
-    def __rmul__(self, other: Union[Self, float, torch.Tensor]) -> Self: ...
-    def __pow__(self, power: float) -> Self: ...
+    def apply(self, op: UnaryOp) -> Self:
+        """Apply a function to the underlying tensor data (e.g., x -> -x)."""
+        ...
+
+    def combine(self, other: Self, op: BinaryOp) -> Self:
+        """Combine self with another instance element-wise (e.g., x + y).
+
+        Note: `other` is guaranteed to be of the same type as `self` because the Mixin handles
+        scalar broadcasting before calling this.
+        """
+        ...
+
+
+class FlowMixin(FlowProtocol):
+    """Mixin for common functionality."""
+
+    @property
+    def device(self) -> torch.device:
+        # Find the device of the underlying data and make sure all underlying data is on the same
+        # device
+        dev = None
+
+        def get_tensor(x: torch.Tensor) -> torch.Tensor:
+            nonlocal dev
+            if dev is None:
+                dev = x.device
+
+            if dev != x.device:
+                raise RuntimeError(f"Inconsistent devices found in {type(self)}.")
+
+            return x
+
+        self.apply(get_tensor)
+
+        if dev is None:
+            raise RuntimeError(f"No tensors found in {type(self)} to determine device.")
+
+        return dev
+
+    def to(self, device: torch.device | str) -> Self:
+        return self.apply(lambda x: x.to(device))
+
+    def _binary_dispatch(self, other: Union[Self, float, torch.Tensor], op: BinaryOp) -> Self:
+        if isinstance(other, torch.Tensor):
+            return self.apply(lambda x: op(x, other))
+
+        if isinstance(other, (int, float)):
+            return self.apply(lambda x: op(x, torch.tensor(other, device=x.device, dtype=x.dtype)))
+
+        if type(other) is type(self):
+            return self.combine(other, op)
+
+        raise TypeError(
+            f"Unsupported operand type(s) for operation: {type(self)} and {type(other)}"
+        )
+
+    def __add__(self, other):
+        return self._binary_dispatch(other, torch.add)
+
+    def __sub__(self, other):
+        return self._binary_dispatch(other, torch.sub)
+
+    def __mul__(self, other):
+        return self._binary_dispatch(other, torch.mul)
+
+    def __truediv__(self, other):
+        return self._binary_dispatch(other, torch.div)
+
+    def __neg__(self):
+        return self.apply(torch.neg)
+
+    def __pow__(self, power):
+        return self.apply(lambda x: torch.pow(x, power))
+
+    def __radd__(self, other):
+        return self._binary_dispatch(other, lambda x, y: torch.add(y, x))
+
+    def __rsub__(self, other):
+        return self._binary_dispatch(other, lambda x, y: torch.sub(y, x))
+
+    def __rmul__(self, other):
+        return self._binary_dispatch(other, lambda x, y: torch.mul(y, x))
 
     def randn_like(self) -> Self:
-        """Generate Gaussian noise with the same shape and type as self."""
-        ...
+        return self.apply(torch.randn_like)
 
     def ones_like(self) -> Self:
-        """Generate ones with the same shape and type as self."""
-        ...
+        return self.apply(torch.ones_like)
 
     def zeros_like(self) -> Self:
-        """Generate zeros with the same shape and type as self."""
-        ...
+        return self.apply(torch.zeros_like)
 
-    def batch_sum(self) -> torch.Tensor:
-        """Sum over all dimensions except the first (batch) dimension.
+    def clone(self) -> Self:
+        return self.apply(torch.clone)
 
-        Returns
-        -------
-        sum : torch.Tensor, shape (batch_size,)
+    def requires_grad(self, mode: bool = True) -> Self:
+        """In-place operation to start recording operations for autograd."""
+        return self.apply(lambda x: x.requires_grad_(mode))
+
+    def gradient(
+        self, outputs: torch.Tensor, create_graph: bool = False, retain_graph: bool = False
+    ) -> Self:
+        """Compute the gradient of output w.r.t. self.
+
+        Returns: An instance of Self containing the gradients.
         """
-        ...
+        # Gather inputs
+        inputs = []
 
-    def to_device(self, device: torch.device | str) -> Self:
-        """Make a copy of the data and move it to the specified device.
+        def gather_inputs(x: torch.Tensor) -> torch.Tensor:
+            inputs.append(x)
+            return x
 
-        Returns
-        -------
-        A copy of self on the specified device.
-        """
-        ...
+        self.apply(gather_inputs)
 
-    def with_requires_grad(self) -> Self:
-        """Set requires_grad=True for all elements in self.
+        # Compute gradients
+        grad_outputs = torch.ones_like(outputs) if outputs.ndim > 0 else None
+        raw_grads = torch.autograd.grad(
+            outputs=outputs,
+            inputs=inputs,
+            grad_outputs=grad_outputs,
+            create_graph=create_graph,
+            retain_graph=retain_graph,
+            allow_unused=True,
+        )
 
-        Returns
-        -------
-        A copy of self with requires_grad=True.
-        """
-        ...
+        # Inject gradients (this is in the same order as we gathered the inputs)
+        grad_iter = iter(raw_grads)
 
-    def gradient(self, x: torch.Tensor) -> Self:
-        """Compute the gradient of x with respect to self.
+        def inject_grads(x: torch.Tensor) -> torch.Tensor:
+            g = next(grad_iter)
+            return g if g is not None else torch.zeros_like(x)
 
-        Parameters
-        ----------
-        x : torch.Tensor
-            A tensor to compute the gradient of.
-
-        Returns
-        -------
-        grad : Self
-            The gradient of x with respect to self.
-        """
-        ...
+        return self.apply(inject_grads)
 
 
-DataType = TypeVar("DataType", bound=DataProtocol)
+class FlowTensor(FlowMixin):
+    """A FlowType wrapper around torch.Tensor."""
 
+    def __init__(self, data: torch.Tensor):
+        if not isinstance(data, torch.Tensor):
+            raise TypeError("FlowTensor expects a torch.Tensor")
 
-class FGTensor(torch.Tensor):
-    """A torch.Tensor subclass that supports required factory methods."""
+        if data.ndim < 1:
+            raise ValueError("FlowTensor expects a tensor with at least 1 dimension")
 
-    @staticmethod
-    def __new__(cls, tensor: torch.Tensor) -> "FGTensor":
-        """Create a new FGTensor from a torch.Tensor."""
-        if isinstance(tensor, FGTensor):
-            return tensor
+        self.data = data
 
-        return tensor.as_subclass(FGTensor)
-
-    def _wrap_result(self, result: torch.Tensor) -> "FGTensor":
-        """Wrap a tensor result as FGTensor."""
-        if isinstance(result, FGTensor):
-            return result
-        return result.as_subclass(FGTensor)
+    def __repr__(self) -> str:
+        return (
+            f"{type(self).__name__}("
+            f"shape={tuple(self.data.shape)}, "
+            f"dtype={self.data.dtype}, "
+            f"device={self.data.device})"
+        )
 
     def __len__(self) -> int:
-        """Get the batch size (length of the first dimension)."""
-        return self.shape[0]
+        return self.data.shape[0]
 
-    def __add__(self, other: Union["FGTensor", float, torch.Tensor]) -> "FGTensor":
-        result = super().__add__(other)
-        return self._wrap_result(result)
+    def __getitem__(self, idx: Union[int, slice]) -> Self:
+        data_out = self.data[idx]
 
-    def __sub__(self, other: Union["FGTensor", float, torch.Tensor]) -> "FGTensor":
-        result = super().__sub__(other)
-        return self._wrap_result(result)
+        if data_out.ndim < self.data.ndim:
+            data_out = data_out.unsqueeze(0)
 
-    def __mul__(self, other: Union["FGTensor", float, torch.Tensor]) -> "FGTensor":
-        result = super().__mul__(other)
-        return self._wrap_result(result)
+        return type(self)(data_out)
 
-    def __truediv__(self, other: Union["FGTensor", float, torch.Tensor]) -> "FGTensor":
-        result = super().__truediv__(other)
-        return self._wrap_result(result)
+    @classmethod
+    def collate(cls, items: Sequence[Self]) -> Self:
+        if not items:
+            raise ValueError("Cannot collate an empty sequence")
 
-    def __neg__(self) -> "FGTensor":
-        result = super().__neg__()
-        return self._wrap_result(result)
+        tensors = [item.data for item in items]
+        return cls(torch.cat(tensors, dim=0))
 
-    def __radd__(self, other: Union["FGTensor", float, torch.Tensor]) -> "FGTensor":
-        result = super().__radd__(other)
-        return self._wrap_result(result)
+    def aggregate(self) -> torch.Tensor:
+        return self.data.sum(dim=tuple(range(1, self.data.ndim)))
 
-    def __rsub__(self, other: Union["FGTensor", float, torch.Tensor]) -> "FGTensor":
-        result = super().__rsub__(other)
-        return self._wrap_result(result)
+    def apply(self, op: UnaryOp) -> Self:
+        return type(self)(op(self.data))
 
-    def __rmul__(self, other: Union["FGTensor", float, torch.Tensor]) -> "FGTensor":
-        result = super().__rmul__(other)
-        return self._wrap_result(result)
-
-    def __pow__(self, power: float) -> "FGTensor":
-        result = super().__pow__(power)
-        return self._wrap_result(result)
-
-    def batch_sum(self) -> torch.Tensor:
-        """Sum over all dimensions except the first (batch) dimension."""
-        return self.sum(dim=tuple(range(1, self.ndim)))
-
-    def randn_like(self) -> "FGTensor":
-        """Generate random normal noise with the same shape and type as self."""
-        return self._wrap_result(torch.randn_like(self))
-
-    def ones_like(self) -> "FGTensor":
-        """Generate ones with the same shape and type as self."""
-        return self._wrap_result(torch.ones_like(self))
-
-    def zeros_like(self) -> "FGTensor":
-        """Generate zeros with the same shape and type as self."""
-        return self._wrap_result(torch.zeros_like(self))
-
-    def to_device(self, device: torch.device | str) -> "FGTensor":
-        """Make a copy of the data and move it to the specified device."""
-        return self._wrap_result(self.clone().to(device))
-
-    def with_requires_grad(self) -> "FGTensor":
-        """Set requires_grad=True for all elements in self."""
-        return self._wrap_result(self.clone().requires_grad_(True))
-
-    def gradient(self, x: torch.Tensor) -> "FGTensor":
-        """Compute the gradient of x w.r.t. self."""
-        grad = torch.autograd.grad(
-            outputs=x,
-            inputs=self,
-            grad_outputs=torch.ones_like(x),
-            create_graph=False,
-            retain_graph=False,
-        )[0]
-        return self._wrap_result(grad)
+    def combine(self, other: Self, op: BinaryOp) -> Self:
+        return type(self)(op(self.data, other.data))

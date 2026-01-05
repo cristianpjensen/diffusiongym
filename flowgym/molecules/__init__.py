@@ -1,4 +1,4 @@
-"""Optional molecule base models and rewards for Flow Gym."""
+"""Molecule base models and rewards for Flow Gym."""
 
 from .base_models.flowmol_model import (
     FlowMolBaseModel,
@@ -12,12 +12,12 @@ from .rewards.protein_docking import ProteinDockingReward
 from .rewards.qed import QEDReward
 from .rewards.utils import non_fragmented, relax_geometry, validate_mol
 from .rewards.validity import ValidityReward
-from .types import FGGraph
+from .types import FlowGraph
 
 __all__ = [
     "BatchedMoleculeReward",
     "DipoleMomentReward",
-    "FGGraph",
+    "FlowGraph",
     "FlowMolBaseModel",
     "FlowMolScheduler",
     "GEOMBaseModel",

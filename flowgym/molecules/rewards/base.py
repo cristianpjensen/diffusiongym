@@ -10,10 +10,10 @@ from rdkit import Chem, RDLogger
 
 from flowgym import Reward
 from flowgym.molecules.rewards.utils import non_fragmented, relax_geometry, validate_mol
-from flowgym.molecules.types import FGGraph
+from flowgym.molecules.types import FlowGraph
 
 
-class MoleculeReward(Reward[FGGraph]):
+class MoleculeReward(Reward[FlowGraph]):
     """Base class for molecule rewards with basic functionalities.
 
     Parameters
@@ -98,12 +98,12 @@ class MoleculeReward(Reward[FGGraph]):
         """
         ...
 
-    def __call__(self, x: FGGraph, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
+    def __call__(self, x: FlowGraph, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
         """Compute the reward for the molecule.
 
         Parameters
         ----------
-        mol : FGGraph
+        mol : FlowGraph
             The molecules to compute the reward for.
 
         Returns
@@ -137,7 +137,7 @@ class MoleculeReward(Reward[FGGraph]):
         return out, valids
 
 
-class BatchedMoleculeReward(Reward[FGGraph]):
+class BatchedMoleculeReward(Reward[FlowGraph]):
     """Base class for molecule rewards with basic functionalities.
 
     Parameters
@@ -227,12 +227,12 @@ class BatchedMoleculeReward(Reward[FGGraph]):
         """
         ...
 
-    def __call__(self, x: FGGraph, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
+    def __call__(self, x: FlowGraph, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
         """Compute the reward for the molecule.
 
         Parameters
         ----------
-        mol : FGGraph
+        mol : FlowGraph
             The molecules to compute the reward for.
 
         Returns

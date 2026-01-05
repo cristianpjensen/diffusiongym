@@ -185,3 +185,4 @@ docs/api/generated/
 jobs/
 slurm-*
 *.pt
+scripts/
