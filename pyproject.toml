@@ -25,11 +25,9 @@ dependencies = [
     "diffusers==0.33.1",
     "transformers>=4.36,<4.43",
     "image-reward>=1.0,<2",
-    "clip @ git+https://github.com/openai/CLIP.git",
     "open-clip-torch>=2.26,<3",
     "peft==0.5.0",
     "torchvision==0.18.1",
-    "flowmol @ git+https://github.com/cristianpjensen/FlowMol.git@a666676c2f3835fc410dede22eb41c5c7c4f2eb8",
 ]
 
 [project.urls]
@@ -49,6 +47,8 @@ find-links = [
 
 [tool.pixi.pypi-dependencies]
 flowgym = { path = ".", editable = true }
+flowmol = { git = "https://github.com/cristianpjensen/FlowMol.git", rev = "8f4c98cbe68111e4e63480b250d925b6d960d3bc" }
+clip = { git = "https://github.com/openai/CLIP.git" }
 
 [tool.pixi.environments]
 default = { solve-group = "default" }

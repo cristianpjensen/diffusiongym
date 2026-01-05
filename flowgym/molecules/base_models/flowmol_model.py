@@ -3,9 +3,17 @@
 from typing import Any
 
 import dgl
-import flowmol
 import torch
-from flowmol.data_processing.utils import build_edge_idxs, get_batch_idxs, get_upper_edge_mask
+
+try:
+    import flowmol
+    from flowmol.data_processing.utils import build_edge_idxs, get_batch_idxs, get_upper_edge_mask
+except ImportError as exc:  # pragma: no cover - only hit when dependency is missing
+    raise ImportError(
+        "FlowMol is required for molecule environments. "
+        "Install it manually, e.g. "
+        "`pip install git+https://github.com/cristianpjensen/FlowMol.git@a666676c2f3835fc410dede22eb41c5c7c4f2eb8`."
+    ) from exc
 
 from flowgym import BaseModel, ConstantNoiseSchedule, CosineScheduler, Scheduler
 from flowgym.molecules.types import FlowGraph
