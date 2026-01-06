@@ -17,8 +17,13 @@ class FlowProtocol(Protocol):
     @classmethod
     def collate(cls: type[Self], items: Sequence[Self]) -> Self: ...
 
-    def aggregate(self) -> torch.Tensor:
+    def aggregate(self, reduction: str = "mean") -> torch.Tensor:
         """Reduce over all dimensions except batch (i.e., sum per sample).
+
+        Parameters
+        ----------
+        reduction : str, default: "mean"
+            Specifies the reduction to apply: "mean" or "sum".
 
         Returns: Tensor of shape (len(self),)
         """
@@ -199,8 +204,18 @@ class FlowTensor(FlowMixin):
         tensors = [item.data for item in items]
         return cls(torch.cat(tensors, dim=0))
 
-    def aggregate(self) -> torch.Tensor:
-        return self.data.sum(dim=tuple(range(1, self.data.ndim)))
+    def aggregate(self, reduction: str = "mean") -> torch.Tensor:
+        dims = tuple(range(1, self.data.ndim))
+        reducers = {
+            "mean": torch.mean,
+            "sum": torch.sum,
+        }
+
+        reducer = reducers.get(reduction, None)
+        if reducer is None:
+            raise ValueError(f"Unsupported reduction type: {reduction}")
+
+        return reducer(self.data, dim=dims)
 
     def apply(self, op: UnaryOp) -> Self:
         return type(self)(op(self.data))

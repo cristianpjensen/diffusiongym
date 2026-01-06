@@ -1,0 +1,4 @@
+Version 1.8
+-----------
+
+- Added ``reduction`` parameter to ``aggregate`` method in ``FlowProtocol``.

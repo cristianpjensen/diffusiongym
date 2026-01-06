@@ -167,22 +167,48 @@ class FlowGraph(FlowMixin):
 
         return type(self)(res, self.ue_mask, self.n_idx, self.e_idx)
 
-    def aggregate(self) -> torch.Tensor:
-        summed = torch.zeros(self.graph.batch_size, device=self.graph.device)
-        for _, val in self.graph.ndata.items():
-            if isinstance(val, torch.Tensor):
-                aggregated = torch.zeros(
-                    self.graph.batch_size, *val.shape[1:], device=val.device, dtype=val.dtype
-                )
-                aggregated.index_add_(0, self.n_idx, val)
-                summed += aggregated.sum(dim=-1)
+    def aggregate(self, reduction: str = "mean") -> torch.Tensor:
+        device = self.graph.device
+        batch_size = self.graph.batch_size
 
-        for _, val in self.graph.edata.items():
-            if isinstance(val, torch.Tensor):
-                aggregated = torch.zeros(
-                    self.graph.batch_size, *val.shape[1:], device=val.device, dtype=val.dtype
-                )
-                aggregated.index_add_(0, self.e_idx, val)
-                summed += aggregated.sum(dim=-1)
+        summed = torch.zeros(batch_size, device=device)
+        numel = torch.zeros(batch_size, device=device)
 
-        return summed
+        def accumulate(data_dict, idx):
+            nonlocal summed, numel
+
+            for val in data_dict.values():
+                if not isinstance(val, torch.Tensor):
+                    continue
+
+                # Aggregate per-graph
+                aggregated = torch.zeros(
+                    batch_size, *val.shape[1:], device=val.device, dtype=val.dtype
+                )
+                aggregated.index_add_(0, idx, val)
+
+                # Sum all feature dimensions
+                summed += aggregated.flatten(start_dim=1).sum(dim=1)
+
+                # Count elements contributing to each graph
+                elems_per_item = val[0].numel()
+                numel.index_add_(
+                    0,
+                    idx,
+                    torch.full(
+                        (val.shape[0],),
+                        elems_per_item,
+                        device=device,
+                        dtype=numel.dtype,
+                    ),
+                )
+
+        accumulate(self.graph.ndata, self.n_idx)
+        accumulate(self.graph.edata, self.e_idx)
+
+        if reduction == "sum":
+            return summed
+        elif reduction == "mean":
+            return summed / numel.clamp_min(1)
+        else:
+            raise ValueError(f"Unsupported reduction type: {reduction}")

@@ -170,7 +170,7 @@ def train_base_model(
             else:
                 raise ValueError(f"Unknown output type: {base_model.output_type}")
 
-            loss = ((pred - target) ** 2).aggregate().mean()
+            loss = ((pred - target) ** 2).aggregate("mean").mean()
 
             opt.zero_grad()
             loss.backward()
