@@ -264,9 +264,13 @@ class Environment(ABC, Generic[D]):
             drifts.append(drift.to("cpu"))
             noises.append(epsilon.to("cpu"))
 
-        x = self.base_model.postprocess(x)
+        sample = self.base_model.postprocess(x)
 
-        rewards, valids = self.reward(x, **kwargs)
+        if self.reward.latent_space:
+            rewards, valids = self.reward(x, **kwargs)
+        else:
+            rewards, valids = self.reward(sample, **kwargs)
+
         rewards = rewards.cpu()
         valids = valids.cpu()
         costs = torch.cat(
@@ -278,4 +282,4 @@ class Environment(ABC, Generic[D]):
         )
         # Reverse cumulative sum
         costs = costs.flip(0).cumsum(0).flip(0)
-        return x, trajectories, drifts, noises, running_costs, rewards, valids, costs, kwargs
+        return sample, trajectories, drifts, noises, running_costs, rewards, valids, costs, kwargs

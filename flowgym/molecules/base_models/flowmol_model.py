@@ -90,7 +90,7 @@ class FlowMolBaseModel(BaseModel[FlowGraph]):
 
     def postprocess(self, x: FlowGraph) -> FlowGraph:
         """Re-name features from x_t to x_1."""
-        g = x.graph
+        g = x.graph.clone()
         for key in list(g.ndata.keys()):
             if key.endswith("_t"):
                 g.ndata[key[:-2] + "_1"] = g.ndata.pop(key)

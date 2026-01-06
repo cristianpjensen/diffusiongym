@@ -1,0 +1,7 @@
+Version 1.9
+-----------
+
+- Fixed the ``to`` method of ``FlowGraph`` to not change the underlying data, but the graph itself.
+- Updated the reward calculation in ``BaseEnvironment`` to handle rewards defined over both latent spaces and postprocessed samples.
+- Corrected the aggregation method in ``Epsilon``, ``Score``, and ``Velocity`` environments to use "sum" instead of the default aggregation.
+- Improved the reduction logic in ``FlowGraph`` to properly compute ``reduction="mean"``.

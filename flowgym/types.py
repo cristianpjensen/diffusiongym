@@ -113,13 +113,31 @@ class FlowMixin(FlowProtocol):
         return self._binary_dispatch(other, lambda x, y: torch.mul(y, x))
 
     def randn_like(self) -> Self:
-        return self.apply(torch.randn_like)
+        def randn_like_to_float(x: torch.Tensor) -> torch.Tensor:
+            if x.dtype.is_floating_point:
+                return torch.randn_like(x)
+
+            return x
+
+        return self.apply(randn_like_to_float)
 
     def ones_like(self) -> Self:
-        return self.apply(torch.ones_like)
+        def ones_like_to_float(x: torch.Tensor) -> torch.Tensor:
+            if x.dtype.is_floating_point:
+                return torch.ones_like(x)
+
+            return x
+
+        return self.apply(ones_like_to_float)
 
     def zeros_like(self) -> Self:
-        return self.apply(torch.zeros_like)
+        def zeros_like_to_float(x: torch.Tensor) -> torch.Tensor:
+            if x.dtype.is_floating_point:
+                return torch.zeros_like(x)
+
+            return x
+
+        return self.apply(zeros_like_to_float)
 
     def clone(self) -> Self:
         return self.apply(torch.clone)

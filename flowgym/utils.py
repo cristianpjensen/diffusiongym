@@ -170,13 +170,12 @@ def train_base_model(
             else:
                 raise ValueError(f"Unknown output type: {base_model.output_type}")
 
-            loss = ((pred - target) ** 2).aggregate("mean").mean()
-
+            loss = ((pred - target) ** 2).aggregate("mean")
             opt.zero_grad()
-            loss.backward()
+            loss.mean().backward()
             opt.step()
 
-            total_loss += loss.item() * len(x1)
+            total_loss += loss.mean().item() * len(x1)
 
         if isinstance(iterator, tqdm):
             iterator.set_postfix({"loss": total_loss / len(dataset)})

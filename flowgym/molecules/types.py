@@ -86,6 +86,18 @@ class FlowGraph(FlowMixin):
         else:
             setattr(self.graph, name, value)
 
+    @property
+    def device(self) -> torch.device:
+        return self.graph.device
+
+    def to(self, device: torch.device | str) -> Self:
+        return type(self)(
+            self.graph.to(device),
+            self.ue_mask.to(device),
+            self.n_idx.to(device),
+            self.e_idx.to(device),
+        )
+
     def __len__(self) -> int:
         return int(self.graph.batch_size)
 
@@ -168,47 +180,48 @@ class FlowGraph(FlowMixin):
         return type(self)(res, self.ue_mask, self.n_idx, self.e_idx)
 
     def aggregate(self, reduction: str = "mean") -> torch.Tensor:
-        device = self.graph.device
-        batch_size = self.graph.batch_size
+        batch_size = len(self)
+        summed = torch.zeros(batch_size, device=self.graph.device)
 
-        summed = torch.zeros(batch_size, device=device)
-        numel = torch.zeros(batch_size, device=device)
+        # Initialize counts if we need to calculate the mean later
+        counts = None
+        if reduction == "mean":
+            counts = torch.zeros(batch_size, device=self.graph.device)
 
-        def accumulate(data_dict, idx):
-            nonlocal summed, numel
-
-            for val in data_dict.values():
-                if not isinstance(val, torch.Tensor):
-                    continue
-
-                # Aggregate per-graph
+        for _, val in self.graph.ndata.items():
+            if isinstance(val, torch.Tensor):
                 aggregated = torch.zeros(
                     batch_size, *val.shape[1:], device=val.device, dtype=val.dtype
                 )
-                aggregated.index_add_(0, idx, val)
+                aggregated.index_add_(0, self.n_idx, val)
+                summed += aggregated.sum(dim=-1)
 
-                # Sum all feature dimensions
-                summed += aggregated.flatten(start_dim=1).sum(dim=1)
+                # Track number of elements added
+                if counts is not None:
+                    num_elements = val[0].numel()
+                    item_counts = torch.zeros(batch_size, device=val.device)
+                    ones = torch.ones(val.size(0), device=val.device)
+                    item_counts.index_add_(0, self.n_idx, ones)
+                    counts += item_counts * num_elements
 
-                # Count elements contributing to each graph
-                elems_per_item = val[0].numel()
-                numel.index_add_(
-                    0,
-                    idx,
-                    torch.full(
-                        (val.shape[0],),
-                        elems_per_item,
-                        device=device,
-                        dtype=numel.dtype,
-                    ),
+        for _, val in self.graph.edata.items():
+            if isinstance(val, torch.Tensor):
+                aggregated = torch.zeros(
+                    batch_size, *val.shape[1:], device=val.device, dtype=val.dtype
                 )
+                aggregated.index_add_(0, self.e_idx, val)
+                summed += aggregated.sum(dim=-1)
 
-        accumulate(self.graph.ndata, self.n_idx)
-        accumulate(self.graph.edata, self.e_idx)
+                # Track number of elements added
+                if counts is not None:
+                    num_elements = val[0].numel()
+                    item_counts = torch.zeros(batch_size, device=val.device)
+                    ones = torch.ones(val.size(0), device=val.device)
+                    item_counts.index_add_(0, self.e_idx, ones)
+                    counts += item_counts * num_elements
 
-        if reduction == "sum":
-            return summed
-        elif reduction == "mean":
-            return summed / numel.clamp_min(1)
-        else:
-            raise ValueError(f"Unsupported reduction type: {reduction}")
+        if counts is not None:
+            # Avoid division by zero for empty graphs
+            return summed / counts.clamp(min=1)
+
+        return summed

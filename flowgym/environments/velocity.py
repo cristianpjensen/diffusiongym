@@ -96,4 +96,4 @@ class VelocityEnvironment(Environment[D]):
             control += control_add
             action += (sigma_ft / b) * control_add
 
-        return a * x + b * action, 0.5 * (control * control).aggregate()
+        return a * x + b * action, 0.5 * (control * control).aggregate("sum")
