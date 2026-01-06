@@ -122,6 +122,15 @@ def train_base_model(
 
     epochs : int
         The number of training epochs.
+
+    batch_size : int
+        Batch size.
+
+    opt : torch.optim.Optimizer
+        Optimizer to use.
+
+    pbar : bool, default: True
+        Whether to display a tqdm progress bar or not.
     """
     base_model.train()
     scheduler = base_model.scheduler
@@ -135,11 +144,10 @@ def train_base_model(
 
     for _ in iterator:
         total_loss = 0.0
-        for batch in loader:
-            x1 = batch[0]
-            x1: D
+        for x1_cpu in loader:
+            x1_cpu: D
 
-            x1 = x1.to(base_model.device)
+            x1 = x1_cpu.to(base_model.device)
             x0 = x1.randn_like()
             t = torch.rand(len(x1), device=x1.device)
 

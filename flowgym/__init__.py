@@ -28,6 +28,7 @@ from flowgym.schedulers import (
     Scheduler,
 )
 from flowgym.types import D, FlowMixin, FlowTensor
+from flowgym.utils import train_base_model
 
 __all__ = [
     "BaseModel",
@@ -49,8 +50,7 @@ __all__ = [
     "VelocityEnvironment",
     "base_model_registry",
     "construct_env",
-    "images",
     "make",
-    "molecules",
     "reward_registry",
+    "train_base_model",
 ]

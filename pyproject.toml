@@ -2,7 +2,7 @@
 name = "flowgym"
 description = "Flow Gym"
 license = {file = "LICENSE"}
-version = "1.6"
+version = "1.7"
 readme = "README.md"
 keywords = []
 authors = [{name = "Cristian Perez Jensen"}]

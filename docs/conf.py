@@ -63,6 +63,7 @@ add_module_names = False
 autodoc_default_options = {
     "inherited-members": False,
 }
+autodoc_mock_imports = ["flowmol", "torch_scatter"]
 
 theme_options = ThemeOptions(
     show_prev_next=True,

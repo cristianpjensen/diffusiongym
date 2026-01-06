@@ -1,0 +1,4 @@
+Version 1.7
+-----------
+
+- Fixed ``train_base_model`` to not only train on a single sample per iteration.

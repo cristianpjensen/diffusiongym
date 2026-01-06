@@ -1,9 +1,6 @@
 Molecules
 =========
 
-.. note::
-    The molecules module requires optional dependencies. Install with the ``molecules`` feature to use this module.
-
 .. currentmodule:: flowgym.molecules
 
 .. autosummary::
