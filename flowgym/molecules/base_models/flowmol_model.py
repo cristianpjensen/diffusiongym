@@ -1,6 +1,6 @@
 """Pre-trained continuous FlowMol model, trained on GEOM-Drugs."""
 
-from typing import Any
+from typing import Any, Optional
 
 import dgl
 import torch
@@ -110,8 +110,8 @@ class FlowMolBaseModel(BaseModel[FlowGraph]):
             t,
             x.n_idx,
             x.ue_mask,
-            apply_softmax=True,
-            remove_com=True,
+            apply_softmax=kwargs.get("apply_softmax", True),
+            remove_com=kwargs.get("remove_com", True),
         )
 
         out_graph = x._get_empty_graph()
@@ -128,6 +128,58 @@ class FlowMolBaseModel(BaseModel[FlowGraph]):
                 out_graph.edata[key] = edge_data
 
         return FlowGraph(out_graph, x.ue_mask, x.n_idx, x.e_idx)
+
+    def train_loss(
+        self,
+        x1: FlowGraph,
+        x0: Optional[FlowGraph] = None,
+        t: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        r"""Compute the training loss.
+
+        Parameters
+        ----------
+        x1 : FlowGraph
+            Target data points.
+
+        x0 : FlowGraph, defaults to Gaussian random noise
+            Initial data points. Is not used for FlowMol.
+
+        t : torch.Tensor, defaults to uniform random samples in [0, 1]
+            Time steps. Is not used for FlowMol.
+
+        Returns
+        -------
+        loss : torch.Tensor
+            Computed loss.
+        """
+        g = x1.graph
+        with g.local_scope():
+            g.ndata["x_1_true"] = g.ndata["x_t"]
+            g.ndata["a_1_true"] = g.ndata["a_t"]
+            g.ndata["c_1_true"] = g.ndata["c_t"]
+            g.edata["e_1_true"] = g.edata["e_t"]
+
+            g.ndata.pop("x_t")
+            g.ndata.pop("a_t")
+            g.ndata.pop("c_t")
+            g.edata.pop("e_t")
+
+            # Remove COM
+            init_coms = dgl.readout_nodes(g, feat="x_1_true", op="mean")
+            g.ndata["x_1_true"] = g.ndata["x_1_true"] - init_coms[x1.n_idx]
+
+            # Sample priors
+            g = self.model.sample_prior(g, x1.n_idx, x1.ue_mask)
+
+            losses = self.model.forward(g)
+
+        total_loss = torch.zeros(1, device=g.device, requires_grad=True)
+        loss_weights = self.model.total_loss_weights
+        for feat in losses.keys():
+            total_loss = total_loss + loss_weights[feat] * losses[feat]
+
+        return total_loss
 
 
 class FlowMolScheduler(Scheduler[FlowGraph]):

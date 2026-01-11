@@ -1068,8 +1068,8 @@ packages:
   timestamp: 1759948208140
 - pypi: ./
   name: flowgym
-  version: '1.8'
-  sha256: 4a4308494825108cdcb8c64942ddd4e1a15a980c21a3f69cf536000acfc7610f
+  version: '1.10'
+  sha256: 6332903d919429542644eb29a12fd75b32c41f8035d7456e7cfa11cf47f7db00
   requires_dist:
   - numpy>=1.24,<3
   - polars>=1.34.0,<2

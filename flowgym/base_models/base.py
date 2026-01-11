@@ -104,3 +104,55 @@ class BaseModel(ABC, nn.Module, Generic[D]):
             Postprocessed output.
         """
         return x
+
+    def train_loss(
+        self, x1: D, x0: Optional[D] = None, t: Optional[torch.Tensor] = None
+    ) -> torch.Tensor:
+        """Compute loss for a single batch training step.
+
+        Parameters
+        ----------
+        x1 : D
+            Target data points.
+
+        x0 : D, defaults to Gaussian random noise
+            Initial data points.
+
+        t : torch.Tensor, defaults to uniform random samples in [0, 1]
+            Time steps.
+
+        Returns
+        -------
+        loss : torch.Tensor, shape (len(x1),)
+            Computed loss for the training step.
+        """
+        if x0 is None:
+            x0 = x1.randn_like()
+
+        if t is None:
+            t = torch.rand(len(x1), device=x1.device)
+
+        assert len(x1) == len(x0), f"Mismatched batch sizes ({len(x1)} != {len(x0)})"
+        assert len(x1) == t.shape[0], f"Mismatched batch sizes ({len(x1)} != {t.shape[0]})"
+
+        alpha = self.scheduler.alpha(x1, t)
+        beta = self.scheduler.beta(x1, t)
+        xt = alpha * x1 + beta * x0
+
+        pred = self.forward(xt, t)
+
+        target = None
+        if self.output_type == "velocity":
+            alpha_dot = self.scheduler.alpha_dot(x1, t)
+            beta_dot = self.scheduler.beta_dot(x1, t)
+            target = alpha_dot * x1 + beta_dot * x0
+        elif self.output_type == "score":
+            target = -x0 / beta
+        elif self.output_type == "endpoint":
+            target = x1
+        elif self.output_type == "epsilon":
+            target = x0
+        else:
+            raise ValueError(f"Unknown output type: {self.output_type}")
+
+        return ((pred - target) ** 2).aggregate("mean")

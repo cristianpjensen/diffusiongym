@@ -105,7 +105,7 @@ class FlowDataset(Dataset[D]):
 def train_base_model(
     base_model: BaseModel[D],
     data: list[D],
-    epochs: int,
+    steps: int,
     batch_size: int,
     opt: torch.optim.Optimizer,
     pbar: bool = False,
@@ -114,14 +114,14 @@ def train_base_model(
 
     Parameters
     ----------
-    model : BaseModel[D]
+    base_model : BaseModel[D]
         The model to train.
 
     data : list[D]
         The training data.
 
-    epochs : int
-        The number of training epochs.
+    steps : int
+        Number of training steps.
 
     batch_size : int
         Batch size.
@@ -129,53 +129,39 @@ def train_base_model(
     opt : torch.optim.Optimizer
         Optimizer to use.
 
-    pbar : bool, default: True
+    pbar : bool, default: False
         Whether to display a tqdm progress bar or not.
     """
-    base_model.train()
-    scheduler = base_model.scheduler
-
     dataset = FlowDataset(data)
     loader = DataLoader(dataset, batch_size, shuffle=True, collate_fn=type(data[0]).collate)
 
-    iterator = range(epochs)
+    # Create an iterator for the dataloader
+    data_iter = iter(loader)
+
+    iterator = range(steps)
     if pbar:
         iterator = tqdm(iterator)
 
+    base_model.train()
     for _ in iterator:
-        total_loss = 0.0
-        for x1_cpu in loader:
-            x1_cpu: D
+        # Get the next batch. If the loader is exhausted, restart it.
+        try:
+            x1_cpu = next(data_iter)
+        except StopIteration:
+            data_iter = iter(loader)
+            x1_cpu = next(data_iter)
 
-            x1 = x1_cpu.to(base_model.device)
-            x0 = x1.randn_like()
-            t = torch.rand(len(x1), device=x1.device)
+        x1_cpu: D
+        x1 = x1_cpu.to(base_model.device)
+        loss = base_model.train_loss(x1).mean()
 
-            alpha = scheduler.alpha(x1, t)
-            beta = scheduler.beta(x1, t)
+        opt.zero_grad()
+        loss.backward()
 
-            xt = alpha * x1 + beta * x0
-            pred = base_model(xt, t)
-
-            if base_model.output_type == "velocity":
-                alpha_dot = scheduler.alpha_dot(x1, t)
-                beta_dot = scheduler.beta_dot(x1, t)
-                target = alpha_dot * x1 + beta_dot * x0
-            elif base_model.output_type == "endpoint":
-                target = x1
-            elif base_model.output_type == "epsilon":
-                target = x0
-            elif base_model.output_type == "score":
-                target = -x0 / beta
-            else:
-                raise ValueError(f"Unknown output type: {base_model.output_type}")
-
-            loss = ((pred - target) ** 2).aggregate("mean")
-            opt.zero_grad()
-            loss.mean().backward()
-            opt.step()
-
-            total_loss += loss.mean().item() * len(x1)
+        grad_norm = nn.utils.clip_grad_norm_(base_model.parameters(), 0.1)
+        opt.step()
 
         if isinstance(iterator, tqdm):
-            iterator.set_postfix({"loss": total_loss / len(dataset)})
+            iterator.set_postfix({"loss": loss.item(), "grad_norm": grad_norm.item()})
+
+    base_model.eval()
