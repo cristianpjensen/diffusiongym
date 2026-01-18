@@ -5,11 +5,12 @@ from __future__ import annotations
 import os
 import tempfile
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Any, Generator, Generic
+from typing import TYPE_CHECKING, Any, Generator, Generic, Optional
 
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
+from torch.utils.data._utils.collate import default_collate
 from tqdm import tqdm
 
 from flowgym.types import D
@@ -85,29 +86,41 @@ class ValuePolicy(nn.Module, Generic[D]):
         return control
 
 
-class FlowDataset(Dataset[D]):
+class FlowDataset(Dataset[tuple[D, dict[str, Any]]]):
     """Dataset wrapper for flowgym data."""
 
-    def __init__(self, data: list[D]):
+    def __init__(self, data: list[D], kwargs: list[dict[str, Any]] | None):
         if len(data) == 0:
             raise ValueError("Data list is empty.")
 
         # Combine all data into a single object
         self.data = type(data[0]).collate(data)
+        self.kwargs = kwargs
 
     def __len__(self) -> int:
         return len(self.data)
 
-    def __getitem__(self, idx: int) -> D:
-        return self.data[idx]
+    def __getitem__(self, idx: int) -> tuple[D, dict[str, Any]]:
+        if self.kwargs is None:
+            return self.data[idx], {}
+
+        return self.data[idx], self.kwargs[idx]
+
+    def collate(self, batch):
+        data_batch, kwargs_batch = zip(*batch)
+        data_batch = type(data_batch[0]).collate(list(data_batch))
+        kwargs_batch = default_collate(kwargs_batch)
+        return data_batch, kwargs_batch
 
 
 def train_base_model(
     base_model: BaseModel[D],
-    data: list[D],
-    steps: int,
-    batch_size: int,
     opt: torch.optim.Optimizer,
+    data: list[D],
+    kwargs: Optional[list[dict]] = None,
+    steps: int = 1000,
+    batch_size: int = 64,
+    accumulate_steps: int = 1,
     pbar: bool = False,
 ) -> None:
     """Trains/fine-tunes a base model.
@@ -117,8 +130,14 @@ def train_base_model(
     base_model : BaseModel[D]
         The model to train.
 
+    opt : torch.optim.Optimizer
+        Optimizer to use.
+
     data : list[D]
         The training data.
+
+    kwargs : list[dict]
+        Keyword arguments corresponding to the data.
 
     steps : int
         Number of training steps.
@@ -126,14 +145,17 @@ def train_base_model(
     batch_size : int
         Batch size.
 
-    opt : torch.optim.Optimizer
-        Optimizer to use.
+    accumulate_steps : int
+        Number of gradient accumulation steps.
 
     pbar : bool, default: False
         Whether to display a tqdm progress bar or not.
     """
-    dataset = FlowDataset(data)
-    loader = DataLoader(dataset, batch_size, shuffle=True, collate_fn=type(data[0]).collate)
+    dataset = FlowDataset(data, kwargs)
+    loader = DataLoader(dataset, batch_size, shuffle=True, collate_fn=dataset.collate)
+
+    base_model.train()
+    opt.zero_grad()
 
     # Create an iterator for the dataloader
     data_iter = iter(loader)
@@ -142,26 +164,34 @@ def train_base_model(
     if pbar:
         iterator = tqdm(iterator)
 
-    base_model.train()
+    loss_sum = 0.0
+    grad_norm_sum = 0.0
+    n_steps = 0
     for _ in iterator:
+        n_steps += 1
+
         # Get the next batch. If the loader is exhausted, restart it.
         try:
-            x1_cpu = next(data_iter)
+            x1_cpu, kwargs = next(data_iter)
         except StopIteration:
             data_iter = iter(loader)
-            x1_cpu = next(data_iter)
+            x1_cpu, kwargs = next(data_iter)
 
         x1_cpu: D
         x1 = x1_cpu.to(base_model.device)
-        loss = base_model.train_loss(x1).mean()
+        loss = base_model.train_loss(x1, **kwargs).mean()
+        loss_sum += loss.item()
 
-        opt.zero_grad()
+        loss = loss / accumulate_steps
         loss.backward()
 
-        grad_norm = nn.utils.clip_grad_norm_(base_model.parameters(), 0.1)
-        opt.step()
+        if n_steps % accumulate_steps == 0:
+            grad_norm = nn.utils.clip_grad_norm_(base_model.parameters(), 0.1)
+            grad_norm_sum += grad_norm.item()
+            opt.step()
+            opt.zero_grad()
 
         if isinstance(iterator, tqdm):
-            iterator.set_postfix({"loss": loss.item(), "grad_norm": grad_norm.item()})
+            iterator.set_postfix({"loss": loss_sum / n_steps, "grad_norm": grad_norm_sum / n_steps})
 
     base_model.eval()

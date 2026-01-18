@@ -1,9 +1,10 @@
 """Pre-trained continuous FlowMol model, trained on GEOM-Drugs."""
 
-from typing import Any, Optional
+from typing import Any
 
 import dgl
 import torch
+import torch.nn.functional as F
 
 try:
     import flowmol
@@ -60,7 +61,15 @@ class FlowMolBaseModel(BaseModel[FlowGraph]):
         -----
         The base distribution :math:`p_0` is a standard Gaussian distribution.
         """
-        n_atoms = self.model.sample_n_atoms(n)
+        n_atoms = kwargs.get("n_atoms", None)
+        if n_atoms is None:
+            n_atoms = self.model.sample_n_atoms(n)
+
+        if isinstance(n_atoms, int):
+            n_atoms = torch.full((n,), n_atoms, dtype=torch.long, device=self.device)
+
+        if len(n_atoms) != n:
+            raise ValueError(f"n_atoms must be of length n ({len(n_atoms)} != {n}).")
 
         edge_idxs_dict = {}
         for n_atoms_i in torch.unique(n_atoms):
@@ -129,12 +138,7 @@ class FlowMolBaseModel(BaseModel[FlowGraph]):
 
         return FlowGraph(out_graph, x.ue_mask, x.n_idx, x.e_idx)
 
-    def train_loss(
-        self,
-        x1: FlowGraph,
-        x0: Optional[FlowGraph] = None,
-        t: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
+    def train_loss(self, x1: FlowGraph, **kwargs: Any) -> torch.Tensor:
         r"""Compute the training loss.
 
         Parameters
@@ -142,42 +146,39 @@ class FlowMolBaseModel(BaseModel[FlowGraph]):
         x1 : FlowGraph
             Target data points.
 
-        x0 : FlowGraph, defaults to Gaussian random noise
-            Initial data points. Is not used for FlowMol.
-
-        t : torch.Tensor, defaults to uniform random samples in [0, 1]
-            Time steps. Is not used for FlowMol.
+        **kwargs : dict
+            Keyword arguments.
 
         Returns
         -------
         loss : torch.Tensor
             Computed loss.
         """
-        g = x1.graph
-        with g.local_scope():
-            g.ndata["x_1_true"] = g.ndata["x_t"]
-            g.ndata["a_1_true"] = g.ndata["a_t"]
-            g.ndata["c_1_true"] = g.ndata["c_t"]
-            g.edata["e_1_true"] = g.edata["e_t"]
+        x0 = x1.randn_like()
+        t = torch.rand(len(x1), device=x1.device)
 
-            g.ndata.pop("x_t")
-            g.ndata.pop("a_t")
-            g.ndata.pop("c_t")
-            g.edata.pop("e_t")
+        alpha = self.scheduler.alpha(x1, t)
+        beta = self.scheduler.beta(x1, t)
+        xt = alpha * x1 + beta * x0
 
-            # Remove COM
-            init_coms = dgl.readout_nodes(g, feat="x_1_true", op="mean")
-            g.ndata["x_1_true"] = g.ndata["x_1_true"] - init_coms[x1.n_idx]
+        pred = self.forward(xt, t, apply_softmax=False, remove_com=False)
 
-            # Sample priors
-            g = self.model.sample_prior(g, x1.n_idx, x1.ue_mask)
+        # It is much more efficient to not weight the loss for each node/edge individually (which is
+        # what they do in the original FlowMol code)
+        losses = {
+            "x": F.mse_loss(pred.graph.ndata["x_t"], x1.graph.ndata["x_t"]),
+            "a": F.cross_entropy(pred.graph.ndata["a_t"], x1.graph.ndata["a_t"].argmax(dim=-1)),
+            "c": F.cross_entropy(pred.graph.ndata["c_t"], x1.graph.ndata["c_t"].argmax(dim=-1)),
+            "e": F.cross_entropy(
+                pred.graph.edata["e_t"][x1.ue_mask],
+                x1.graph.edata["e_t"][x1.ue_mask].argmax(dim=-1),
+            ),
+        }
 
-            losses = self.model.forward(g)
-
-        total_loss = torch.zeros(1, device=g.device, requires_grad=True)
+        total_loss = torch.zeros(1, device=x1.device, requires_grad=True)
         loss_weights = self.model.total_loss_weights
-        for feat in losses.keys():
-            total_loss = total_loss + loss_weights[feat] * losses[feat]
+        for feat, loss in losses.items():
+            total_loss = total_loss + loss_weights[feat] * loss
 
         return total_loss
 
@@ -187,7 +188,7 @@ class FlowMolScheduler(Scheduler[FlowGraph]):
 
     def __init__(
         self,
-        cosine_params: tuple[float, float, float, float] = (1.0, 2.0, 2.0, 2.0),
+        cosine_params: tuple[float, float, float, float] = (1, 2, 2, 2),
     ) -> None:
         self.schedulers = {
             "x_t": CosineScheduler(cosine_params[0]),
@@ -259,7 +260,7 @@ class GEOMBaseModel(FlowMolBaseModel):
     """Pre-trained continuous flow matching model, trained on GEOM-Drugs."""
 
     def __init__(self, device: torch.device):
-        super().__init__("geom_gaussian", (1.0, 2.0, 2.0, 2.0), device)
+        super().__init__("geom_gaussian", (1, 2, 2, 2), device)
 
 
 @base_model_registry.register("molecules/flowmol_qm9")
@@ -267,4 +268,4 @@ class QM9BaseModel(FlowMolBaseModel):
     """Pre-trained continuous flow matching model, trained on QM9."""
 
     def __init__(self, device: torch.device):
-        super().__init__("qm9_gaussian", (1.0, 2.0, 2.0, 1.5), device)
+        super().__init__("qm9_gaussian", (1, 2, 2, 1.5), device)

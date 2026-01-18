@@ -18,12 +18,10 @@ class DiTBaseModel(BaseModel[FlowTensor]):
 
     output_type = "epsilon"
 
-    def __init__(self, device: Optional[torch.device]):
+    def __init__(self, cfg_scale: float = 0.0, device: Optional[torch.device] = None):
         super().__init__(device)
 
-        pipe = DiTPipeline.from_pretrained(
-            "facebook/DiT-XL-2-256",
-        ).to(device)
+        pipe = DiTPipeline.from_pretrained("facebook/DiT-XL-2-256").to(device)
         self.pipe = pipe
         self.transformer = pipe.transformer
 
@@ -33,10 +31,16 @@ class DiTBaseModel(BaseModel[FlowTensor]):
         pipe.scheduler.alphas_cumprod = pipe.scheduler.alphas_cumprod.to(device)
         self._scheduler = DiffusionScheduler(pipe.scheduler.alphas_cumprod)
 
+        self.cfg_scale = cfg_scale
+
     @property
     def scheduler(self) -> DiffusionScheduler:
         """Scheduler used for sampling."""
         return self._scheduler
+
+    @property
+    def do_cfg(self) -> bool:
+        return self.cfg_scale > 0.0
 
     def sample_p0(self, n: int, **kwargs: Any) -> tuple[FlowTensor, dict[str, Any]]:
         """Sample n latent datapoints from the base distribution :math:`p_0`.
@@ -63,7 +67,6 @@ class DiTBaseModel(BaseModel[FlowTensor]):
         The base distribution :math:`p_0` is a standard Gaussian distribution.
         """
         class_labels = kwargs.get("class_labels", None)
-        cfg_scale = kwargs.get("cfg_scale", 0.0)
 
         # If no prompt is provided, sample them
         if class_labels is None:
@@ -83,7 +86,7 @@ class DiTBaseModel(BaseModel[FlowTensor]):
 
         return (
             FlowTensor(torch.randn(n, self.channels, self.dim, self.dim, device=self.device)),
-            {"class_labels": class_labels, "cfg_scale": cfg_scale},
+            {"class_labels": class_labels},
         )
 
     def preprocess(self, x: FlowTensor, **kwargs: Any) -> tuple[FlowTensor, dict[str, Any]]:
@@ -106,13 +109,10 @@ class DiTBaseModel(BaseModel[FlowTensor]):
             Preprocessed keyword arguments.
         """
         class_labels = kwargs.get("class_labels", None)
-        cfg_scale = kwargs.get("cfg_scale", 0.0)
-
         if class_labels is None:
             raise ValueError("class_labels must be provided in kwargs.")
 
         return x, {
-            "cfg_scale": cfg_scale,
             "class_labels": class_labels,
         }
 
@@ -161,18 +161,11 @@ class DiTBaseModel(BaseModel[FlowTensor]):
         x_tensor = x.data
         k = self.scheduler.model_input(t)
 
-        cfg_scale = kwargs.get("cfg_scale", 0.0)
         class_labels = kwargs.get("class_labels")
-
         if class_labels is None:
             raise ValueError("class_labels must be provided in kwargs.")
 
-        if isinstance(cfg_scale, torch.Tensor):
-            use_cfg = torch.any(cfg_scale > 0).item()
-        else:
-            use_cfg = cfg_scale > 0
-
-        if not use_cfg:
+        if not self.do_cfg or self.training:
             out = cast("torch.Tensor", self.transformer(x_tensor, k, class_labels).sample[:, :4])
             return FlowTensor(out)
 
@@ -184,6 +177,6 @@ class DiTBaseModel(BaseModel[FlowTensor]):
 
         # Classifier-free guidance
         cond, uncond = out[:, :4].chunk(2)
-        out = (cfg_scale + 1) * cond - cfg_scale * uncond
+        out = (self.cfg_scale + 1) * cond - self.cfg_scale * uncond
 
         return FlowTensor(out)

@@ -35,16 +35,17 @@ class CosineScheduler(Scheduler[FlowTensor]):
         self.nu = nu
 
     def alpha(self, x: FlowTensor, t: torch.Tensor) -> FlowTensor:
-        alpha = 1 - torch.cos((t**self.nu) * torch.pi / 2).square()
+        alpha = 1 - torch.cos(0.5 * torch.pi * torch.pow(t, self.nu)).square()
         return FlowTensor(append_dims(alpha, x.data.ndim))
 
     def alpha_dot(self, x: FlowTensor, t: torch.Tensor) -> FlowTensor:
+        t = t.clamp(min=1e-9)
         alpha_dot = (
-            self.nu
+            0.5
+            * self.nu
             * torch.pi
-            * (t ** (self.nu - 1))
-            * torch.sin((t**self.nu) * torch.pi / 2)
-            * torch.cos((t**self.nu) * torch.pi / 2)
+            * torch.pow(t, self.nu - 1)
+            * torch.sin(torch.pow(t, self.nu) * torch.pi)
         )
         return FlowTensor(append_dims(alpha_dot, x.data.ndim))
 

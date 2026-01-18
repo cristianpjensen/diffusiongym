@@ -105,9 +105,7 @@ class BaseModel(ABC, nn.Module, Generic[D]):
         """
         return x
 
-    def train_loss(
-        self, x1: D, x0: Optional[D] = None, t: Optional[torch.Tensor] = None
-    ) -> torch.Tensor:
+    def train_loss(self, x1: D, **kwargs: Any) -> torch.Tensor:
         """Compute loss for a single batch training step.
 
         Parameters
@@ -115,31 +113,22 @@ class BaseModel(ABC, nn.Module, Generic[D]):
         x1 : D
             Target data points.
 
-        x0 : D, defaults to Gaussian random noise
-            Initial data points.
-
-        t : torch.Tensor, defaults to uniform random samples in [0, 1]
-            Time steps.
+        **kwargs : dict
+            Keyword arguments
 
         Returns
         -------
         loss : torch.Tensor, shape (len(x1),)
             Computed loss for the training step.
         """
-        if x0 is None:
-            x0 = x1.randn_like()
-
-        if t is None:
-            t = torch.rand(len(x1), device=x1.device)
-
-        assert len(x1) == len(x0), f"Mismatched batch sizes ({len(x1)} != {len(x0)})"
-        assert len(x1) == t.shape[0], f"Mismatched batch sizes ({len(x1)} != {t.shape[0]})"
+        x0 = x1.randn_like()
+        t = torch.rand(len(x1), device=x1.device)
 
         alpha = self.scheduler.alpha(x1, t)
         beta = self.scheduler.beta(x1, t)
         xt = alpha * x1 + beta * x0
 
-        pred = self.forward(xt, t)
+        pred = self.forward(xt, t, **kwargs)
 
         target = None
         if self.output_type == "velocity":

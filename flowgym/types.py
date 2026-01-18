@@ -57,14 +57,14 @@ class FlowMixin(FlowProtocol):
                 dev = x.device
 
             if dev != x.device:
-                raise RuntimeError(f"Inconsistent devices found in {type(self)}.")
+                raise RuntimeError(f"Inconsistent devices found in {self.__class__}.")
 
             return x
 
         self.apply(get_tensor)
 
         if dev is None:
-            raise RuntimeError(f"No tensors found in {type(self)} to determine device.")
+            raise RuntimeError(f"No tensors found in {self.__class__} to determine device.")
 
         return dev
 
@@ -78,11 +78,11 @@ class FlowMixin(FlowProtocol):
         if isinstance(other, (int, float)):
             return self.apply(lambda x: op(x, torch.tensor(other, device=x.device, dtype=x.dtype)))
 
-        if type(other) is type(self):
+        if type(other) is self.__class__:
             return self.combine(other, op)
 
         raise TypeError(
-            f"Unsupported operand type(s) for operation: {type(self)} and {type(other)}"
+            f"Unsupported operand type(s) for operation: {self.__class__} and {type(other)}"
         )
 
     def __add__(self, other):
@@ -197,7 +197,7 @@ class FlowTensor(FlowMixin):
 
     def __repr__(self) -> str:
         return (
-            f"{type(self).__name__}("
+            f"{self.__class__.__name__}("
             f"shape={tuple(self.data.shape)}, "
             f"dtype={self.data.dtype}, "
             f"device={self.data.device})"
@@ -212,7 +212,7 @@ class FlowTensor(FlowMixin):
         if data_out.ndim < self.data.ndim:
             data_out = data_out.unsqueeze(0)
 
-        return type(self)(data_out)
+        return self.__class__(data_out)
 
     @classmethod
     def collate(cls, items: Sequence[Self]) -> Self:
@@ -236,7 +236,7 @@ class FlowTensor(FlowMixin):
         return reducer(self.data, dim=dims)
 
     def apply(self, op: UnaryOp) -> Self:
-        return type(self)(op(self.data))
+        return self.__class__(op(self.data))
 
     def combine(self, other: Self, op: BinaryOp) -> Self:
-        return type(self)(op(self.data, other.data))
+        return self.__class__(op(self.data, other.data))

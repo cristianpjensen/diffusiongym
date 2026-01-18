@@ -2,6 +2,7 @@
 
 import json
 import random
+from importlib.resources import open_text
 from typing import TYPE_CHECKING, Any, Optional, cast
 
 import torch
@@ -19,7 +20,13 @@ class StableDiffusionBaseModel(BaseModel[FlowTensor]):
 
     output_type = "epsilon"
 
-    def __init__(self, model_name: str, device: Optional[torch.device]):
+    def __init__(
+        self,
+        model_name: str,
+        cfg_scale: float = 0.0,
+        prompts: Optional[list[str]] = None,
+        device: Optional[torch.device] = None,
+    ):
         super().__init__(device)
 
         pipe = StableDiffusionPipeline.from_pretrained(model_name).to(device)
@@ -32,15 +39,24 @@ class StableDiffusionBaseModel(BaseModel[FlowTensor]):
         pipe.scheduler.alphas_cumprod = pipe.scheduler.alphas_cumprod.to(device)
         self._scheduler = DiffusionScheduler(pipe.scheduler.alphas_cumprod)
 
-        with open("flowgym/images/base_models/refl_data.json", "r") as f:
-            refl_data = json.load(f)
+        self.cfg_scale = cfg_scale
 
-        self.prompts = [item["text"] for item in refl_data]
+        if prompts is None:
+            with open_text("flowgym.images.base_models", "refl_data.json", encoding="utf-8") as f:
+                refl_data = json.load(f)
+
+            prompts = [item["text"] for item in refl_data]
+
+        self.prompts = prompts
 
     @property
     def scheduler(self) -> DiffusionScheduler:
         """Scheduler used for sampling."""
         return self._scheduler
+
+    @property
+    def do_cfg(self) -> bool:
+        return self.cfg_scale > 0.0
 
     def sample_p0(self, n: int, **kwargs: Any) -> tuple[FlowTensor, dict[str, Any]]:
         """Sample n latent datapoints from the base distribution :math:`p_0`.
@@ -67,11 +83,10 @@ class StableDiffusionBaseModel(BaseModel[FlowTensor]):
         The base distribution :math:`p_0` is a standard Gaussian distribution.
         """
         prompt = kwargs.get("prompt", None)
-        cfg_scale = kwargs.get("cfg_scale", 0.0)
 
         # If no prompt is provided, sample them
         if prompt is None:
-            prompt = random.sample(self.prompts, n)
+            prompt = random.choices(self.prompts, k=n)
 
         # If a single prompt is provided, replicate it
         if not isinstance(prompt, list):
@@ -85,7 +100,7 @@ class StableDiffusionBaseModel(BaseModel[FlowTensor]):
 
         return (
             FlowTensor(torch.randn(n, self.channels, self.dim, self.dim, device=self.device)),
-            {"prompt": prompt, "cfg_scale": cfg_scale},
+            {"prompt": prompt},
         )
 
     def preprocess(self, x: FlowTensor, **kwargs: Any) -> tuple[FlowTensor, dict[str, Any]]:
@@ -111,7 +126,6 @@ class StableDiffusionBaseModel(BaseModel[FlowTensor]):
         encoder_hidden_states = kwargs.get("encoder_hidden_states")
         prompt = kwargs.get("prompt")
         neg_prompt = kwargs.get("neg_prompt", "")
-        cfg_scale = kwargs.get("cfg_scale", 0.0)
 
         if encoder_hidden_states is None and prompt is None:
             raise ValueError("Either encoder_hidden_states or a prompt needs to be provided.")
@@ -135,7 +149,7 @@ class StableDiffusionBaseModel(BaseModel[FlowTensor]):
                     )
 
             prompt_embeds, neg_prompt_embeds = self.pipe.encode_prompt(
-                prompt, self.device, 1, cfg_scale > 0, neg_prompt
+                prompt, self.device, 1, self.do_cfg, neg_prompt
             )
             encoder_hidden_states = prompt_embeds
             if neg_prompt_embeds is not None:
@@ -145,7 +159,6 @@ class StableDiffusionBaseModel(BaseModel[FlowTensor]):
 
         return x, {
             "encoder_hidden_states": encoder_hidden_states,
-            "cfg_scale": cfg_scale,
             "prompt": prompt,
             "neg_prompt": neg_prompt,
         }
@@ -195,17 +208,11 @@ class StableDiffusionBaseModel(BaseModel[FlowTensor]):
         x_tensor = x.data
         k = self.scheduler.model_input(t)
 
-        cfg_scale = kwargs.get("cfg_scale", 0.0)
         encoder_hidden_states = kwargs.get("encoder_hidden_states")
         if encoder_hidden_states is None:
             raise ValueError("encoder_hidden_states must be provided in kwargs.")
 
-        if isinstance(cfg_scale, torch.Tensor):
-            use_cfg = torch.any(cfg_scale > 0).item()
-        else:
-            use_cfg = cfg_scale > 0
-
-        if not use_cfg:
+        if not self.do_cfg or self.training:
             out = cast("torch.Tensor", self.unet(x_tensor, k, encoder_hidden_states).sample)
             return FlowTensor(out)
 
@@ -215,7 +222,7 @@ class StableDiffusionBaseModel(BaseModel[FlowTensor]):
 
         # Classifier-free guidance
         cond, uncond = out.chunk(2)
-        out = (cfg_scale + 1) * cond - cfg_scale * uncond
+        out = (self.cfg_scale + 1) * cond - self.cfg_scale * uncond
 
         return FlowTensor(out)
 
@@ -224,13 +231,33 @@ class StableDiffusionBaseModel(BaseModel[FlowTensor]):
 class SD2BaseModel(StableDiffusionBaseModel):
     """Pre-trained 512x512 Stable Diffusion 2 base."""
 
-    def __init__(self, device: Optional[torch.device]):
-        super().__init__("PeggyWang/stable-diffusion-2-base", device)
+    def __init__(
+        self,
+        cfg_scale: float = 0.0,
+        prompts: Optional[list[str]] = None,
+        device: Optional[torch.device] = None,
+    ):
+        super().__init__(
+            "PeggyWang/stable-diffusion-2-base",
+            cfg_scale=cfg_scale,
+            prompts=prompts,
+            device=device,
+        )
 
 
 @base_model_registry.register("images/sd1.5")
 class SD15BaseModel(StableDiffusionBaseModel):
     """Pre-trained 512x512 Stable Diffusion 1.5."""
 
-    def __init__(self, device: Optional[torch.device]):
-        super().__init__("sd-legacy/stable-diffusion-v1-5", device)
+    def __init__(
+        self,
+        cfg_scale: float = 0.0,
+        prompts: Optional[list[str]] = None,
+        device: Optional[torch.device] = None,
+    ):
+        super().__init__(
+            "sd-legacy/stable-diffusion-v1-5",
+            cfg_scale=cfg_scale,
+            prompts=prompts,
+            device=device,
+        )

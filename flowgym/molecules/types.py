@@ -1,6 +1,6 @@
 """Types for molecular graphs in Flow Gym."""
 
-from typing import Any, Optional, Sequence, Union
+from typing import Optional, Sequence, Union
 
 import dgl
 import torch
@@ -71,27 +71,18 @@ class FlowGraph(FlowMixin):
 
     def __repr__(self) -> str:
         return (
-            f"{type(self).__name__}("
+            f"{self.__class__.__name__}("
             f"num_nodes={self.graph.num_nodes()}, "
             f"num_edges={self.graph.num_edges()}, "
             f"batch_size={len(self)})"
         )
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self.graph, name)
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        if name == "graph":
-            object.__setattr__(self, name, value)
-        else:
-            setattr(self.graph, name, value)
 
     @property
     def device(self) -> torch.device:
         return self.graph.device
 
     def to(self, device: torch.device | str) -> Self:
-        return type(self)(
+        return self.__class__(
             self.graph.to(device),
             self.ue_mask.to(device),
             self.n_idx.to(device),
@@ -103,14 +94,16 @@ class FlowGraph(FlowMixin):
 
     def __getitem__(self, idx: Union[int, slice]) -> Self:
         if isinstance(idx, int):
+            n = len(self)
+
             # Faster to use slice_batch if we only want one item
             if idx < 0:
-                idx += len(self)
+                idx += n
 
-            if idx < 0 or idx >= len(self):
-                raise IndexError(f"Index {idx} out of range for batch size {len(self)}")
+            if idx < 0 or idx >= n:
+                raise IndexError(f"Index {idx} out of range for batch size {n}")
 
-            return type(self)(dgl.slice_batch(self.graph, idx))
+            return self.__class__(dgl.slice_batch(self.graph, idx))
 
         if isinstance(idx, slice):
             graphs = dgl.unbatch(self.graph)
@@ -119,7 +112,7 @@ class FlowGraph(FlowMixin):
             if not selected_graphs:
                 raise ValueError("The slice resulted in an empty graph sequence.")
 
-            return type(self)(dgl.batch(selected_graphs))
+            return self.__class__(dgl.batch(selected_graphs))
 
         raise TypeError(f"Invalid index type: {type(idx)}")
 
@@ -153,7 +146,7 @@ class FlowGraph(FlowMixin):
             if isinstance(val, torch.Tensor):
                 res.edata[key] = op(val)
 
-        return type(self)(res, self.ue_mask, self.n_idx, self.e_idx)
+        return self.__class__(res, self.ue_mask, self.n_idx, self.e_idx)
 
     def combine(self, other: Union[Self, float, torch.Tensor], op: BinaryOp) -> Self:
         res = self._get_empty_graph()
@@ -177,7 +170,7 @@ class FlowGraph(FlowMixin):
             for key, val in self.graph.edata.items():
                 res.edata[key] = op(val, other)  # type: ignore
 
-        return type(self)(res, self.ue_mask, self.n_idx, self.e_idx)
+        return self.__class__(res, self.ue_mask, self.n_idx, self.e_idx)
 
     def aggregate(self, reduction: str = "mean") -> torch.Tensor:
         batch_size = len(self)
@@ -225,3 +218,15 @@ class FlowGraph(FlowMixin):
             return summed / counts.clamp(min=1)
 
         return summed
+
+    def randn_like(self) -> Self:
+        out = super().randn_like()
+
+        # Remove COM
+        init_coms = dgl.readout_nodes(out.graph, feat="x_t", op="mean")
+        out.graph.ndata["x_t"] = out.graph.ndata["x_t"] - init_coms[out.n_idx]
+
+        # Also make sure that both sides of edges are equivalent
+        out.graph.edata["e_t"][~out.ue_mask] = out.graph.edata["e_t"][out.ue_mask]
+
+        return out
