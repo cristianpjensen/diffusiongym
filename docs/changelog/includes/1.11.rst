@@ -1,0 +1,8 @@
+Version 1.11
+-----------
+
+- Added keyword argument support for ``train_base_model``.
+- Removed timestep-dependent loss for FlowMol in ``train_loss`` method, which is much more memory- and time-efficient.
+- Introduced ``prompts`` argument to Stable Diffusion to customize training prompts.
+- Made classifier-free guidance scale part of the base model configuration, rather than inference.
+- Corrected ``FlowGraph.randn_like()`` to ensure proper sampling from zero-mean Gaussian positions and upper edge masking.
