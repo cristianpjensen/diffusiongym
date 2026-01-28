@@ -100,5 +100,5 @@ class CIFARBaseModel(BaseModel[FlowTensor]):
             Output of the model.
         """
         k = self.scheduler.model_input(t)
-        output = cast("torch.Tensor", self.unet(x, k, **kwargs).sample)
+        output = cast("torch.Tensor", self.unet(x.data, k, **kwargs).sample)
         return FlowTensor(output)

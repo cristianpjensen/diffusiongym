@@ -40,6 +40,7 @@ class StableDiffusionBaseModel(BaseModel[FlowTensor]):
         self._scheduler = DiffusionScheduler(pipe.scheduler.alphas_cumprod)
 
         self.cfg_scale = cfg_scale
+        self.p_dropout = 0.1
 
         if prompts is None:
             with open_text("flowgym.images.base_models", "refl_data.json", encoding="utf-8") as f:
@@ -212,7 +213,7 @@ class StableDiffusionBaseModel(BaseModel[FlowTensor]):
         if encoder_hidden_states is None:
             raise ValueError("encoder_hidden_states must be provided in kwargs.")
 
-        if not self.do_cfg or self.training:
+        if not self.do_cfg or self.training or encoder_hidden_states.shape[0] == x_tensor.shape[0]:
             out = cast("torch.Tensor", self.unet(x_tensor, k, encoder_hidden_states).sample)
             return FlowTensor(out)
 
@@ -225,6 +226,31 @@ class StableDiffusionBaseModel(BaseModel[FlowTensor]):
         out = (self.cfg_scale + 1) * cond - self.cfg_scale * uncond
 
         return FlowTensor(out)
+
+    def train_loss(
+        self,
+        x1: FlowTensor,
+        xt: Optional[FlowTensor] = None,
+        t: Optional[torch.Tensor] = None,
+        **kwargs: Any,
+    ) -> torch.Tensor:
+        """Add prompt dropout for training when CFG is enabled."""
+        if self.do_cfg and self.p_dropout > 0:
+            cond_embeds = kwargs["encoder_hidden_states"]
+            uncond_embeds, _ = self.pipe.encode_prompt(
+                prompt="",
+                device=x1.device,
+                num_images_per_prompt=1,
+                do_classifier_free_guidance=False,
+            )
+            uncond_embeds = uncond_embeds.expand(cond_embeds.shape[0], -1, -1)
+
+            mask = torch.rand(cond_embeds.shape[0], device=cond_embeds.device) < self.p_dropout
+            mask = mask[:, None, None]
+
+            kwargs["encoder_hidden_states"] = torch.where(mask, uncond_embeds, cond_embeds)
+
+        return super().train_loss(x1, xt, t, **kwargs)
 
 
 @base_model_registry.register("images/sd2")

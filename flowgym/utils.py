@@ -152,7 +152,14 @@ def train_base_model(
         Whether to display a tqdm progress bar or not.
     """
     dataset = FlowDataset(data, kwargs)
-    loader = DataLoader(dataset, batch_size, shuffle=True, collate_fn=dataset.collate)
+    loader = DataLoader(
+        dataset,
+        batch_size,
+        shuffle=True,
+        collate_fn=dataset.collate,
+        num_workers=0,
+        pin_memory=False,
+    )
 
     base_model.train()
     opt.zero_grad()

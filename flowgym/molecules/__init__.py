@@ -6,28 +6,36 @@ from .base_models.flowmol_model import (
     GEOMBaseModel,
     QM9BaseModel,
 )
-from .rewards.base import BatchedMoleculeReward, MoleculeReward
-from .rewards.dipole_moment import DipoleMomentReward, TargetDipoleMomentReward
-from .rewards.protein_docking import ProteinDockingReward
 from .rewards.qed import QEDReward
-from .rewards.utils import non_fragmented, relax_geometry, validate_mol
+from .rewards.utils import graph_to_mols, is_not_fragmented, is_valid
 from .rewards.validity import ValidityReward
+from .rewards.xtb import (
+    DipoleMomentReward,
+    EnergyReward,
+    HeatCapacityReward,
+    HOMOLUMOGapReward,
+    HOMOReward,
+    LUMOReward,
+    PolarizabilityReward,
+)
 from .types import FlowGraph
 
 __all__ = [
-    "BatchedMoleculeReward",
     "DipoleMomentReward",
+    "EnergyReward",
     "FlowGraph",
     "FlowMolBaseModel",
     "FlowMolScheduler",
     "GEOMBaseModel",
-    "MoleculeReward",
-    "ProteinDockingReward",
+    "HOMOLUMOGapReward",
+    "HOMOReward",
+    "HeatCapacityReward",
+    "LUMOReward",
+    "PolarizabilityReward",
     "QEDReward",
     "QM9BaseModel",
-    "TargetDipoleMomentReward",
     "ValidityReward",
-    "non_fragmented",
-    "relax_geometry",
-    "validate_mol",
+    "graph_to_mols",
+    "is_not_fragmented",
+    "is_valid",
 ]

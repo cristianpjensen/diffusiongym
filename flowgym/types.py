@@ -146,6 +146,10 @@ class FlowMixin(FlowProtocol):
         """In-place operation to start recording operations for autograd."""
         return self.apply(lambda x: x.requires_grad_(mode))
 
+    def detach(self) -> Self:
+        """Return a new instance detached from the current computation graph."""
+        return self.apply(torch.detach)
+
     def gradient(
         self, outputs: torch.Tensor, create_graph: bool = False, retain_graph: bool = False
     ) -> Self:

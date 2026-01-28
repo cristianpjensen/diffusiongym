@@ -1,8 +1,8 @@
 """Public implementation of Value Matching."""
 
 import logging
-import os
 import time
+from pathlib import Path
 from typing import Callable, Optional
 
 import polars as pl
@@ -22,7 +22,7 @@ def value_matching(
     num_iterations: int = 1000,
     lr: float = 1e-4,
     log_every: Optional[int] = None,
-    exp_dir: Optional[os.PathLike[str]] = None,
+    exp_dir: Optional[Path | str] = None,
     fn_every: Optional[Callable[[int, Environment[D]], None]] = None,
     kwargs: Optional[dict] = None,
 ) -> None:
@@ -45,16 +45,16 @@ def value_matching(
     lr : float, default=1e-4
         The learning rate for the optimizer.
 
-    log_every : Optional[int], default=None
-        How often to log training statistics. If None, it will log 100 times during training
+    log_every : int, default=100 times
+        How often to log training statistics.
 
-    exp_dir : Optional[os.PathLike], default=None
-        Directory to save training statistics and model checkpoints. If None, no files are saved.
+    exp_dir : Path | str, default=no saved files
+        Directory to save training statistics and model checkpoints.
 
-    fn_every : Optional[Callable[[int, Environment], None]], default=None
+    fn_every : (int, Environment) -> None, default=no logging
         A function to call every `log_every` iterations with the current iteration and environment.
 
-    kwargs : Optional[dict], default=None
+    kwargs : dict, default={}
         Additional keyword arguments to pass to the value network.
     """
     value_network.to(env.device)
@@ -64,11 +64,15 @@ def value_matching(
     cosine = CosineAnnealingLR(opt, T_max=num_iterations - 100, eta_min=1e-2 * lr)
     scheduler = SequentialLR(opt, [warmup, cosine], milestones=[100])
 
+    if isinstance(exp_dir, str):
+        exp_dir = Path(exp_dir)
+
     if log_every is None:
         log_every = max(1, num_iterations // 100)
 
     if exp_dir is not None:
-        os.makedirs(os.path.join(exp_dir, "checkpoints"), exist_ok=True)
+        exp_dir.mkdir(parents=True, exist_ok=True)
+        (exp_dir / "checkpoints").mkdir(exist_ok=True)
 
     if kwargs is None:
         kwargs = {}
@@ -82,13 +86,8 @@ def value_matching(
 
     for it in range(1, num_iterations + 1):
         with torch.no_grad():
-            _, trajectories, _, _, running_costs, rewards, valids, costs, current_kwargs = (
-                env.sample(
-                    batch_size,
-                    pbar=False,
-                    **kwargs,
-                )
-            )
+            out = env.sample(batch_size, pbar=False, **kwargs)
+            _, trajectories, _, _, running_costs, rewards, valids, costs, current_kwargs = out
 
         opt.zero_grad()
 
@@ -102,7 +101,7 @@ def value_matching(
             output = value_network(x_t, t_curr, **current_kwargs).squeeze(-1)
             target = costs[idx].to(env.device)
 
-            loss = (weight * ((output - target) / env.reward_scale).square()).mean()
+            loss = (weight * (output - target).square()).mean()
             loss /= env.discretization_steps
 
             if loss.isnan().any() or loss.isinf().any():
@@ -116,13 +115,13 @@ def value_matching(
         scheduler.step()
 
         if exp_dir is not None:
-            torch.save(value_network.state_dict(), os.path.join(exp_dir, "checkpoints", "last.pt"))
+            torch.save(value_network.state_dict(), exp_dir / "checkpoints" / "last.pt")
 
         report.update(
             loss=total_loss,
-            r_mean=rewards.mean().item(),
-            r_std=rewards.std().item(),
-            valids=valids.float().mean().item(),
+            r_mean=rewards[valids].mean().item(),
+            r_std=rewards[valids].std().item(),
+            validity=valids.float().mean().item(),
             running_cost=running_costs[:-1].mean().item(),
             cost=(costs[0] - costs[-1]).mean().item(),
             grad_norm=grad_norm.item(),
@@ -136,35 +135,33 @@ def value_matching(
                 **{k: v[-1] for k, v in report.stats.items()},
             }
             df = pl.DataFrame([row])
-            stats_file = os.path.join(exp_dir, "training_stats.csv")
-            write_header = not os.path.exists(stats_file)
+            stats_file = exp_dir / "training_stats.csv"
             # Stream-write to stats_file with Polars
             with open(stats_file, "a", newline="") as f:
-                df.write_csv(f, include_header=write_header)
+                df.write_csv(f, include_header=not stats_file.exists())
 
         # Log stats and save weights
         if it % log_every == 0:
             logging.info(
-                f"(step={it:06d}) {report}, "
-                f"max vram={torch.cuda.max_memory_allocated() * 1e-9:.2f}GB"
+                f"(step={it:06d}) {report}, vram={torch.cuda.max_memory_allocated() * 1e-9:.2f}GB"
             )
 
             if exp_dir is not None:
                 torch.save(
-                    value_network.state_dict(),
-                    os.path.join(exp_dir, "checkpoints", f"iter_{it:06d}.pt"),
+                    value_network.state_dict(), exp_dir / "checkpoints" / f"iter_{it:06d}.pt"
                 )
 
         if fn_every is not None:
             fn_every(it, env)
 
 
+@torch.no_grad()
 def get_loss_weights(env: Environment[D]) -> torch.Tensor:
     """Compute loss weights for value matching, inversely proportional to future variance.
 
     Parameters
     ----------
-    env : Environment
+    env : Environment[D]
         The environment to compute the loss weights for.
 
     Returns
@@ -172,10 +169,13 @@ def get_loss_weights(env: Environment[D]) -> torch.Tensor:
     weights : torch.Tensor, shape (discretization_steps + 1,)
         The loss weights for each time step.
     """
+    # Get a single sample so we can compute sigma
+    x = env.base_model.sample_p0(1)[0]
+    xs = type(x).collate([x] * (env.discretization_steps + 1)).to(env.device)
+
     ts = torch.linspace(2e-2, 1, env.discretization_steps + 1, device=env.device)
     dt = ts[1] - ts[0]
-    # todo: fix access to scheduler
-    sigmas = env.scheduler._sigma(ts).square().mean(dim=-1)
-    cumsigmas = sigmas.flip(0).cumsum(0).flip(0) * dt
-    weights: torch.Tensor = 1 / (1 + 0.5 * cumsigmas)
-    return weights
+
+    sigmas = (env.scheduler.sigma(xs, ts) ** 2).aggregate(reduction="mean")
+    rev_cum_sigmas = sigmas.flip(0).cumsum(0).flip(0) * dt
+    return 1 / (env.reward_scale * (1 + 0.5 * rev_cum_sigmas))

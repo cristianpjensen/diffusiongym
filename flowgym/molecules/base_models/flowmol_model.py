@@ -1,6 +1,6 @@
 """Pre-trained continuous FlowMol model, trained on GEOM-Drugs."""
 
-from typing import Any
+from typing import Any, Optional
 
 import dgl
 import torch
@@ -138,44 +138,75 @@ class FlowMolBaseModel(BaseModel[FlowGraph]):
 
         return FlowGraph(out_graph, x.ue_mask, x.n_idx, x.e_idx)
 
-    def train_loss(self, x1: FlowGraph, **kwargs: Any) -> torch.Tensor:
-        r"""Compute the training loss.
+    def train_loss(
+        self,
+        x1: FlowGraph,
+        xt: Optional[FlowGraph] = None,
+        t: Optional[torch.Tensor] = None,
+        **kwargs: Any,
+    ) -> torch.Tensor:
+        """Compute loss for a single batch training step.
 
         Parameters
         ----------
         x1 : FlowGraph
             Target data points.
+        xt : Optional[FlowGraph], default=None
+            Noisy data points at time t. If None, will be sampled.
+        t : Optional[torch.Tensor], shape (len(x1),), default=None
+            Time steps. If None, will be sampled.
 
         **kwargs : dict
-            Keyword arguments.
+            Keyword arguments
 
         Returns
         -------
-        loss : torch.Tensor
-            Computed loss.
+        loss : torch.Tensor, shape (len(x1),)
+            Computed loss for the training step.
         """
-        x0 = x1.randn_like()
-        t = torch.rand(len(x1), device=x1.device)
+        if t is None:
+            t = torch.rand(len(x1), device=x1.device)
+
+        assert t.shape == (len(x1),)
 
         alpha = self.scheduler.alpha(x1, t)
         beta = self.scheduler.beta(x1, t)
-        xt = alpha * x1 + beta * x0
+
+        if xt is None:
+            x0 = x1.randn_like()
+            xt = alpha * x1 + beta * x0
+        else:
+            assert len(xt) == len(x1)
+            x0 = (xt - alpha * x1) / beta
 
         pred = self.forward(xt, t, apply_softmax=False, remove_com=False)
+        g = pred.graph
 
-        # It is much more efficient to not weight the loss for each node/edge individually (which is
-        # what they do in the original FlowMol code)
-        losses = {
-            "x": F.mse_loss(pred.graph.ndata["x_t"], x1.graph.ndata["x_t"]),
-            "a": F.cross_entropy(pred.graph.ndata["a_t"], x1.graph.ndata["a_t"].argmax(dim=-1)),
-            "c": F.cross_entropy(pred.graph.ndata["c_t"], x1.graph.ndata["c_t"].argmax(dim=-1)),
-            "e": F.cross_entropy(
-                pred.graph.edata["e_t"][x1.ue_mask],
-                x1.graph.edata["e_t"][x1.ue_mask].argmax(dim=-1),
-            ),
-        }
+        with g.local_scope():
+            # It is much more efficient to not weight the loss for each node/edge individually
+            # (which is what they do in the original FlowMol code)
+            g.ndata["loss_x"] = F.mse_loss(
+                g.ndata["x_t"], x1.graph.ndata["x_t"], reduction="none"
+            ).mean(dim=-1)  # type: ignore
+            g.ndata["loss_a"] = F.cross_entropy(
+                g.ndata["a_t"], x1.graph.ndata["a_t"].argmax(dim=-1), reduction="none"
+            )  # type: ignore
+            g.ndata["loss_c"] = F.cross_entropy(
+                g.ndata["c_t"], x1.graph.ndata["c_t"].argmax(dim=-1), reduction="none"
+            )  # type: ignore
+            # todo: only over upper edge
+            g.edata["loss_e"] = F.cross_entropy(
+                g.edata["e_t"], x1.graph.edata["e_t"].argmax(dim=-1), reduction="none"
+            )  # type: ignore
 
-        total_loss = torch.zeros(1, device=x1.device, requires_grad=True)
+            losses = {
+                "x": dgl.readout_nodes(g, feat="loss_x", op="mean"),
+                "a": dgl.readout_nodes(g, feat="loss_a", op="mean"),
+                "c": dgl.readout_nodes(g, feat="loss_c", op="mean"),
+                "e": dgl.readout_edges(g, feat="loss_e", op="mean"),
+            }
+
+        total_loss = torch.zeros(len(x1), device=x1.device, requires_grad=True)
         loss_weights = self.model.total_loss_weights
         for feat, loss in losses.items():
             total_loss = total_loss + loss_weights[feat] * loss

@@ -105,13 +105,23 @@ class BaseModel(ABC, nn.Module, Generic[D]):
         """
         return x
 
-    def train_loss(self, x1: D, **kwargs: Any) -> torch.Tensor:
+    def train_loss(
+        self,
+        x1: D,
+        xt: Optional[D] = None,
+        t: Optional[torch.Tensor] = None,
+        **kwargs: Any,
+    ) -> torch.Tensor:
         """Compute loss for a single batch training step.
 
         Parameters
         ----------
         x1 : D
             Target data points.
+        xt : Optional[D], default=None
+            Noisy data points at time t. If None, will be sampled.
+        t : Optional[torch.Tensor], shape (len(x1),), default=None
+            Time steps. If None, will be sampled.
 
         **kwargs : dict
             Keyword arguments
@@ -121,12 +131,20 @@ class BaseModel(ABC, nn.Module, Generic[D]):
         loss : torch.Tensor, shape (len(x1),)
             Computed loss for the training step.
         """
-        x0 = x1.randn_like()
-        t = torch.rand(len(x1), device=x1.device)
+        if t is None:
+            t = torch.rand(len(x1), device=x1.device)
+
+        assert t.shape == (len(x1),)
 
         alpha = self.scheduler.alpha(x1, t)
         beta = self.scheduler.beta(x1, t)
-        xt = alpha * x1 + beta * x0
+
+        if xt is None:
+            x0 = x1.randn_like()
+            xt = alpha * x1 + beta * x0
+        else:
+            assert len(xt) == len(x1)
+            x0 = (xt - alpha * x1) / beta
 
         pred = self.forward(xt, t, **kwargs)
 

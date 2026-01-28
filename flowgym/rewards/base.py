@@ -18,3 +18,12 @@ class Reward(ABC, Generic[D]):
     @abstractmethod
     def __call__(self, x: D, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
         """Compute the reward and validity for the given input x."""
+
+
+class DummyReward(Reward[D]):
+    """Dummy reward that always returns zero."""
+
+    latent_space = True
+
+    def __call__(self, x: D, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
+        return torch.zeros(len(x), device=x.device), torch.ones(len(x), device=x.device)

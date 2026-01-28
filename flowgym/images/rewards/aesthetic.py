@@ -63,7 +63,7 @@ class AestheticReward(Reward[FlowTensor]):
             img_feats /= img_feats.norm(dim=-1, keepdim=True)
             rewards.append(self.model(img_feats))
 
-        return torch.cat(rewards).squeeze(-1), torch.ones(len(x), device=x.device)
+        return torch.cat(rewards).squeeze(-1), torch.ones(len(x), device=x.device, dtype=torch.bool)
 
     def _get_aesthetic_model(self, clip_model: str = "vit_l_14") -> nn.Module:
         """Source: https://github.com/LAION-AI/aesthetic-predictor/blob/main/asthetics_predictor.ipynb."""

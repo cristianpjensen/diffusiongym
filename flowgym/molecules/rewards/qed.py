@@ -1,21 +1,36 @@
-"""Validity reward for molecules."""
+"""QED reward for molecules."""
 
-from typing import Any, Optional
+from typing import Any
 
-from rdkit import Chem
+import torch
+from rdkit import RDLogger
 from rdkit.Chem import QED
 
-from flowgym.molecules.rewards.base import MoleculeReward
+from flowgym.molecules.types import FlowGraph
 from flowgym.registry import reward_registry
+from flowgym.rewards import Reward
+
+from .utils import graph_to_mols, is_not_fragmented, is_valid
 
 
 @reward_registry.register("molecules/qed")
-class QEDReward(MoleculeReward):
+class QEDReward(Reward[FlowGraph]):
     """QED reward for molecules."""
 
-    def __init__(self, atom_type_map: Optional[list[str]] = None) -> None:
-        super().__init__(atom_type_map, True, True, False)
+    def __init__(self) -> None:
+        RDLogger.DisableLog("rdApp.*")  # type: ignore
 
-    def compute_reward(self, mol: Chem.Mol, **kwargs: Any) -> float | None:
-        """Compute Quantitative Estimate of Drug-likeness (QED) score."""
-        return QED.qed(mol)  # type: ignore
+        # Int -> Atom type string for FlowMol models
+        self.atom_type_map = ["C", "H", "N", "O", "F", "P", "S", "Cl", "Br", "I"]
+
+    def __call__(self, x: FlowGraph, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
+        mols = graph_to_mols(x, self.atom_type_map)
+
+        rewards = torch.zeros(len(x), device=x.graph.device)
+        valids = torch.zeros(len(x), device=x.graph.device, dtype=torch.bool)
+        for i, mol in enumerate(mols):
+            if is_valid(mol) and is_not_fragmented(mol):
+                rewards[i] = QED.qed(mol)
+                valids[i] = True
+
+        return rewards, valids

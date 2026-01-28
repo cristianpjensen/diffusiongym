@@ -260,9 +260,9 @@ class Environment(ABC, Generic[D]):
             x += dt * drift + torch.sqrt(dt) * diffusion * epsilon
 
             running_costs[i] = running_cost
-            trajectories.append(x.to("cpu"))
-            drifts.append(drift.to("cpu"))
-            noises.append(epsilon.to("cpu"))
+            trajectories.append(x.detach().to("cpu"))
+            drifts.append(drift.detach().to("cpu"))
+            noises.append(epsilon.detach().to("cpu"))
 
         sample = self.base_model.postprocess(x)
 
