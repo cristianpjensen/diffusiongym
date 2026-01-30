@@ -105,9 +105,7 @@ class Registry(Generic[T]):
         """
         if entry_point is not None:
             if id in self._registry:
-                raise ValueError(
-                    f"{id} is already registered in {self.name} with a different class"
-                )
+                raise ValueError(f"{id} is already registered in {self.name} with a different class")
 
             self._registry[id] = RegistryEntry(entry_point, default_kwargs)
             return entry_point
@@ -115,9 +113,7 @@ class Registry(Generic[T]):
         # Return decorator
         def _decorator(cls: type[T]) -> type[T]:
             if id in self._registry:
-                raise ValueError(
-                    f"{id} is already registered in {self.name} with a different class"
-                )
+                raise ValueError(f"{id} is already registered in {self.name} with a different class")
 
             self._registry[id] = RegistryEntry(cls, default_kwargs)
             return cls
@@ -143,10 +139,7 @@ class Registry(Generic[T]):
             If the ID is not registered.
         """
         if id not in self._registry:
-            raise KeyError(
-                f"{id} is not registered in {self.name}. "
-                f"Available: {', '.join(sorted(self._registry.keys()))}"
-            )
+            raise KeyError(f"{id} is not registered in {self.name}. Available: {', '.join(sorted(self._registry.keys()))}")
 
         return self._registry[id]
 

@@ -142,14 +142,10 @@ def value_matching(
 
         # Log stats and save weights
         if it % log_every == 0:
-            logging.info(
-                f"(step={it:06d}) {report}, vram={torch.cuda.max_memory_allocated() * 1e-9:.2f}GB"
-            )
+            logging.info(f"(step={it:06d}) {report}, vram={torch.cuda.max_memory_allocated() * 1e-9:.2f}GB")
 
             if exp_dir is not None:
-                torch.save(
-                    value_network.state_dict(), exp_dir / "checkpoints" / f"iter_{it:06d}.pt"
-                )
+                torch.save(value_network.state_dict(), exp_dir / "checkpoints" / f"iter_{it:06d}.pt")
 
         if fn_every is not None:
             fn_every(it, env)

@@ -40,8 +40,8 @@ class XTBReward(Reward[FlowGraph]):
         else:
             self.relax = lambda x: x
 
-    def __call__(self, x: FlowGraph, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
-        mols = graph_to_mols(x, self.atom_type_map)
+    def __call__(self, sample: FlowGraph, latent: FlowGraph, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
+        mols = graph_to_mols(sample, self.atom_type_map)
 
         valid_mols = []
         valid_indices = []
@@ -56,8 +56,8 @@ class XTBReward(Reward[FlowGraph]):
         else:
             xtb_results = parallel_xtb(valid_mols)
 
-        rewards = self.invalid_val * torch.ones(len(x), device=x.graph.device)
-        valids = torch.zeros(len(x), device=x.graph.device, dtype=torch.bool)
+        rewards = self.invalid_val * torch.ones(len(sample), device=sample.device)
+        valids = torch.zeros(len(sample), device=sample.device, dtype=torch.bool)
         for idx, res in zip(valid_indices, xtb_results):
             if res is None:
                 continue
@@ -209,9 +209,7 @@ class XTBResult:
 
         match = re.search(pattern, self.log_content)
         if not match:
-            raise ValueError(
-                "Heat capacity (TOT row) not found in log output. Did you run with --ohess?"
-            )
+            raise ValueError("Heat capacity (TOT row) not found in log output. Did you run with --ohess?")
 
         return float(match.group(1))
 
@@ -229,11 +227,7 @@ def parallel_xtb(mols: list[Chem.Mol]) -> list[XTBResult | None]:
 
         # Compute properties using GFN2-xTB
         # Added --hess to calculate Hessian (needed for Heat Capacity)
-        os.system(
-            f"parallel -j {ncpus} "
-            f"'xtb {{}} --hess --parallel 1 --namespace {{/.}} --json > {{/.}}.out 2>&1' "
-            "::: *.xyz"
-        )
+        os.system(f"parallel -j {ncpus} 'xtb {{}} --hess --parallel 1 --namespace {{/.}} --json > {{/.}}.out 2>&1' ::: *.xyz")
 
         # Read results
         for i in range(1, len(mols) + 1):

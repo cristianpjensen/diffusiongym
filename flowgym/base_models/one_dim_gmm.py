@@ -175,9 +175,7 @@ class SinusoidalTimeEmbedding(nn.Module):
         t_mult: float = 1000.0,
     ) -> None:
         super().__init__()
-        self.mlp = nn.Sequential(
-            nn.Linear(dim, hidden_dim), nn.SiLU(), nn.Linear(hidden_dim, hidden_dim)
-        )
+        self.mlp = nn.Sequential(nn.Linear(dim, hidden_dim), nn.SiLU(), nn.Linear(hidden_dim, hidden_dim))
 
         self.t_mult = t_mult
         half = dim // 2

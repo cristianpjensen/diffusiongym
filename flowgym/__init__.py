@@ -12,6 +12,7 @@ from flowgym.environments import (
     EndpointEnvironment,
     Environment,
     EpsilonEnvironment,
+    Sample,
     ScoreEnvironment,
     VelocityEnvironment,
 )
@@ -45,6 +46,7 @@ __all__ = [
     "NoiseSchedule",
     "OptimalTransportScheduler",
     "Reward",
+    "Sample",
     "Scheduler",
     "ScoreEnvironment",
     "VelocityEnvironment",

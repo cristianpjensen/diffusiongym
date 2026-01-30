@@ -81,9 +81,7 @@ class FlowMixin(FlowProtocol):
         if type(other) is self.__class__:
             return self.combine(other, op)
 
-        raise TypeError(
-            f"Unsupported operand type(s) for operation: {self.__class__} and {type(other)}"
-        )
+        raise TypeError(f"Unsupported operand type(s) for operation: {self.__class__} and {type(other)}")
 
     def __add__(self, other):
         return self._binary_dispatch(other, torch.add)
@@ -150,9 +148,7 @@ class FlowMixin(FlowProtocol):
         """Return a new instance detached from the current computation graph."""
         return self.apply(torch.detach)
 
-    def gradient(
-        self, outputs: torch.Tensor, create_graph: bool = False, retain_graph: bool = False
-    ) -> Self:
+    def gradient(self, outputs: torch.Tensor, create_graph: bool = False, retain_graph: bool = False) -> Self:
         """Compute the gradient of output w.r.t. self.
 
         Returns: An instance of Self containing the gradients.
@@ -200,12 +196,7 @@ class FlowTensor(FlowMixin):
         self.data = data
 
     def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}("
-            f"shape={tuple(self.data.shape)}, "
-            f"dtype={self.data.dtype}, "
-            f"device={self.data.device})"
-        )
+        return f"{self.__class__.__name__}(shape={tuple(self.data.shape)}, dtype={self.data.dtype}, device={self.data.device})"
 
     def __len__(self) -> int:
         return self.data.shape[0]

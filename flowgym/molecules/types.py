@@ -70,12 +70,7 @@ class FlowGraph(FlowMixin):
         self.e_idx = e_idx
 
     def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}("
-            f"num_nodes={self.graph.num_nodes()}, "
-            f"num_edges={self.graph.num_edges()}, "
-            f"batch_size={len(self)})"
-        )
+        return f"{self.__class__.__name__}(num_nodes={self.graph.num_nodes()}, num_edges={self.graph.num_edges()}, batch_size={len(self)})"
 
     @property
     def device(self) -> torch.device:
@@ -183,9 +178,7 @@ class FlowGraph(FlowMixin):
 
         for _, val in self.graph.ndata.items():
             if isinstance(val, torch.Tensor):
-                aggregated = torch.zeros(
-                    batch_size, *val.shape[1:], device=val.device, dtype=val.dtype
-                )
+                aggregated = torch.zeros(batch_size, *val.shape[1:], device=val.device, dtype=val.dtype)
                 aggregated.index_add_(0, self.n_idx, val)
                 summed += aggregated.sum(dim=-1)
 
@@ -199,9 +192,7 @@ class FlowGraph(FlowMixin):
 
         for _, val in self.graph.edata.items():
             if isinstance(val, torch.Tensor):
-                aggregated = torch.zeros(
-                    batch_size, *val.shape[1:], device=val.device, dtype=val.dtype
-                )
+                aggregated = torch.zeros(batch_size, *val.shape[1:], device=val.device, dtype=val.dtype)
                 aggregated.index_add_(0, self.e_idx, val)
                 summed += aggregated.sum(dim=-1)
 

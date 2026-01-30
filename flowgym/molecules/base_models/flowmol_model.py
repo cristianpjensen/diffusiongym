@@ -185,19 +185,11 @@ class FlowMolBaseModel(BaseModel[FlowGraph]):
         with g.local_scope():
             # It is much more efficient to not weight the loss for each node/edge individually
             # (which is what they do in the original FlowMol code)
-            g.ndata["loss_x"] = F.mse_loss(
-                g.ndata["x_t"], x1.graph.ndata["x_t"], reduction="none"
-            ).mean(dim=-1)  # type: ignore
-            g.ndata["loss_a"] = F.cross_entropy(
-                g.ndata["a_t"], x1.graph.ndata["a_t"].argmax(dim=-1), reduction="none"
-            )  # type: ignore
-            g.ndata["loss_c"] = F.cross_entropy(
-                g.ndata["c_t"], x1.graph.ndata["c_t"].argmax(dim=-1), reduction="none"
-            )  # type: ignore
+            g.ndata["loss_x"] = F.mse_loss(g.ndata["x_t"], x1.graph.ndata["x_t"], reduction="none").mean(dim=-1)  # type: ignore
+            g.ndata["loss_a"] = F.cross_entropy(g.ndata["a_t"], x1.graph.ndata["a_t"].argmax(dim=-1), reduction="none")  # type: ignore
+            g.ndata["loss_c"] = F.cross_entropy(g.ndata["c_t"], x1.graph.ndata["c_t"].argmax(dim=-1), reduction="none")  # type: ignore
             # todo: only over upper edge
-            g.edata["loss_e"] = F.cross_entropy(
-                g.edata["e_t"], x1.graph.edata["e_t"].argmax(dim=-1), reduction="none"
-            )  # type: ignore
+            g.edata["loss_e"] = F.cross_entropy(g.edata["e_t"], x1.graph.edata["e_t"].argmax(dim=-1), reduction="none")  # type: ignore
 
             losses = {
                 "x": dgl.readout_nodes(g, feat="loss_x", op="mean"),
@@ -232,9 +224,7 @@ class FlowMolScheduler(Scheduler[FlowGraph]):
     def _alpha(self, x: FlowGraph, t: torch.Tensor) -> torch.Tensor:
         out = torch.zeros(t.shape[0], len(self.schedulers), device=t.device, dtype=t.dtype)
         for idx, key in enumerate(self.scheduler_order):
-            val = self.schedulers[key].alpha(
-                FlowTensor(torch.zeros(x.graph.batch_size, 1, device=x.device)), t
-            )
+            val = self.schedulers[key].alpha(FlowTensor(torch.zeros(x.graph.batch_size, 1, device=x.device)), t)
             out[:, idx] = val.data.squeeze(-1)
 
         return out
@@ -260,9 +250,7 @@ class FlowMolScheduler(Scheduler[FlowGraph]):
     def _alpha_dot(self, x: FlowGraph, t: torch.Tensor) -> torch.Tensor:
         out = torch.zeros(t.shape[0], len(self.schedulers), device=t.device, dtype=t.dtype)
         for idx, key in enumerate(self.scheduler_order):
-            val = self.schedulers[key].alpha_dot(
-                FlowTensor(torch.zeros(x.graph.batch_size, 1, device=x.device)), t
-            )
+            val = self.schedulers[key].alpha_dot(FlowTensor(torch.zeros(x.graph.batch_size, 1, device=x.device)), t)
             out[:, idx] = val.data.squeeze(-1)
 
         return out

@@ -1,0 +1,7 @@
+Version 1.13
+------------
+
+- ``Environment[D].sample`` now outputs a ``Sample[D]`` data class instead of a tuple.
+- Added ``Environment[D].batch_sample`` to sample in batches and outputs a single ``Sample[D]``.
+- No longer need to specify whether ``Reward[D]`` is defined over latent space of sample space,
+  ``Reward[D].__call__`` takes both as input.

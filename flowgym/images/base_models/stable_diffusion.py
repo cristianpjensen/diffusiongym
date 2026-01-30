@@ -94,10 +94,7 @@ class StableDiffusionBaseModel(BaseModel[FlowTensor]):
             prompt = [prompt] * n
 
         if len(prompt) != n:
-            raise ValueError(
-                "The prompt must be a list of strings with length equal to the batch "
-                f"size, got length {len(prompt)}."
-            )
+            raise ValueError(f"The prompt must be a list of strings with length equal to the batch size, got length {len(prompt)}.")
 
         return (
             FlowTensor(torch.randn(n, self.channels, self.dim, self.dim, device=self.device)),
@@ -135,9 +132,7 @@ class StableDiffusionBaseModel(BaseModel[FlowTensor]):
             if not isinstance(prompt, list):
                 prompt = [prompt] * n
 
-            assert len(prompt) == n, (
-                "The prompt must be a list of strings with length equal to the batch size."
-            )
+            assert len(prompt) == n, "The prompt must be a list of strings with length equal to the batch size."
 
             if neg_prompt is not None:
                 if not isinstance(neg_prompt, list):
@@ -149,9 +144,7 @@ class StableDiffusionBaseModel(BaseModel[FlowTensor]):
                         "batch size.",
                     )
 
-            prompt_embeds, neg_prompt_embeds = self.pipe.encode_prompt(
-                prompt, self.device, 1, self.do_cfg, neg_prompt
-            )
+            prompt_embeds, neg_prompt_embeds = self.pipe.encode_prompt(prompt, self.device, 1, self.do_cfg, neg_prompt)
             encoder_hidden_states = prompt_embeds
             if neg_prompt_embeds is not None:
                 encoder_hidden_states = torch.cat([prompt_embeds, neg_prompt_embeds], dim=0)

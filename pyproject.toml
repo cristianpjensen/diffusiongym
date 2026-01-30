@@ -2,7 +2,7 @@
 name = "flowgym"
 description = "Flow Gym"
 license = {file = "LICENSE"}
-version = "1.12"
+version = "1.13"
 readme = "README.md"
 keywords = []
 authors = [{name = "Cristian Perez Jensen"}]
@@ -79,7 +79,7 @@ ipykernel = ">=6.30.1,<7"
 pip = ">=25.2,<26"
 
 [tool.ruff]
-line-length = 100
+line-length = 150
 
 [tool.ruff.lint]
 select = [

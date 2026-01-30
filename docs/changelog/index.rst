@@ -9,6 +9,8 @@ Changelog
 
 ----
 
+.. include:: includes/1.13.rst
+
 .. include:: includes/1.12.rst
 
 .. include:: includes/1.11.rst

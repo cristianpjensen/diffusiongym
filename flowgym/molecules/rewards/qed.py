@@ -23,11 +23,11 @@ class QEDReward(Reward[FlowGraph]):
         # Int -> Atom type string for FlowMol models
         self.atom_type_map = ["C", "H", "N", "O", "F", "P", "S", "Cl", "Br", "I"]
 
-    def __call__(self, x: FlowGraph, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
-        mols = graph_to_mols(x, self.atom_type_map)
+    def __call__(self, sample: FlowGraph, latent: FlowGraph, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
+        mols = graph_to_mols(sample, self.atom_type_map)
 
-        rewards = torch.zeros(len(x), device=x.graph.device)
-        valids = torch.zeros(len(x), device=x.graph.device, dtype=torch.bool)
+        rewards = torch.zeros(len(sample), device=sample.device)
+        valids = torch.zeros(len(sample), device=sample.device, dtype=torch.bool)
         for i, mol in enumerate(mols):
             if is_valid(mol) and is_not_fragmented(mol):
                 rewards[i] = QED.qed(mol)

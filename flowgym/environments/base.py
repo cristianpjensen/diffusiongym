@@ -1,16 +1,92 @@
 """Base environment classes and interfaces for flowgym."""
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from itertools import pairwise
 from typing import Any, Generic, Iterable, Optional, Protocol
 
 import torch
+from torch.utils.data._utils.collate import default_collate
 from tqdm.auto import tqdm
 
 from flowgym.base_models import BaseModel
 from flowgym.rewards import Reward
 from flowgym.schedulers import MemorylessNoiseSchedule, Scheduler
 from flowgym.types import D
+from flowgym.utils import index_dict
+
+
+@dataclass
+class Sample(Generic[D]):
+    sample: D
+    latent: D
+    trajectory: list[D]
+    drifts: list[D]
+    noises: list[D]
+    running_costs: torch.Tensor
+    rewards: torch.Tensor
+    valids: torch.Tensor
+    cost_functionals: torch.Tensor
+    kwargs: dict[str, Any]
+
+    def __post_init__(self):
+        n = len(self.sample)
+        assert len(self.latent) == n, f"latent batch size != sample batch size, got {len(self.latent)} != {n}"
+        assert len(self.trajectory[0]) == n, f"trajectory batch size != sample batch size, got {len(self.trajectory[0])} != {n}"
+        assert len(self.drifts[0]) == n, f"drift batch size != sample batch size, got {len(self.drifts[0])} != {n}"
+        assert len(self.noises[0]) == n, f"noise batch size != sample batch size, got {len(self.noises[0])} != {n}"
+        assert self.running_costs.shape[1] == n, f"running_costs batch size != sample batch size, got {self.running_costs.shape[0]} != {n}"
+        assert self.rewards.shape[0] == n, f"rewards batch size != sample batch size, got {self.rewards.shape[0]} != {n}"
+        assert self.valids.shape[0] == n, f"valids batch size != sample batch size, got {self.valids.shape[0]} != {n}"
+        assert self.cost_functionals.shape[1] == n, f"cost functionals batch size != sample batch size, got {self.cost_functionals.shape[0]} != {n}"
+
+        num_steps = len(self.trajectory) - 1
+        assert len(self.drifts) == num_steps, f"drifts length != number of steps, got {len(self.drifts)} != {num_steps}"
+        assert len(self.noises) == num_steps, f"noises length != number of steps, got {len(self.noises)} != {num_steps}"
+        assert self.running_costs.shape[0] == num_steps, f"running_costs length != number of steps, got {self.running_costs.shape[0]} != {num_steps}"
+        assert self.cost_functionals.shape[0] == num_steps + 1, (
+            f"cost_functionals length != number of steps + 1, got {self.cost_functionals.shape[0]} != {num_steps + 1}"
+        )
+
+    def __len__(self):
+        return len(self.sample)
+
+    def __getitem__(self, idx: int) -> "Sample[D]":
+        return Sample(
+            sample=self.sample[idx],
+            latent=self.latent[idx],
+            trajectory=[state[idx] for state in self.trajectory],
+            drifts=[drift[idx] for drift in self.drifts],
+            noises=[noise[idx] for noise in self.noises],
+            running_costs=self.running_costs[:, idx : idx + 1],
+            rewards=self.rewards[idx : idx + 1],
+            valids=self.valids[idx : idx + 1],
+            cost_functionals=self.cost_functionals[:, idx : idx + 1],
+            kwargs=index_dict(self.kwargs, idx, idx + 1),
+        )
+
+    @staticmethod
+    def concat(samples: list["Sample[D]"]) -> "Sample[D]":
+        data_type = type(samples[0].sample)
+        num_steps = len(samples[0].trajectory) - 1
+
+        all_kwargs = []
+        for sample in samples:
+            for i in range(len(sample)):
+                all_kwargs.append(index_dict(sample.kwargs, i))
+
+        return Sample(
+            sample=data_type.collate([x.sample for x in samples]),
+            latent=data_type.collate([x.latent for x in samples]),
+            trajectory=[data_type.collate([x.trajectory[t] for x in samples]) for t in range(num_steps + 1)],
+            drifts=[data_type.collate([x.drifts[t] for x in samples]) for t in range(num_steps)],
+            noises=[data_type.collate([x.noises[t] for x in samples]) for t in range(num_steps)],
+            running_costs=torch.cat([x.running_costs for x in samples], dim=1),
+            rewards=torch.cat([x.rewards for x in samples], dim=0),
+            valids=torch.cat([x.valids for x in samples], dim=0),
+            cost_functionals=torch.cat([x.cost_functionals for x in samples], dim=1),
+            kwargs=default_collate(all_kwargs),  # type: ignore
+        )
 
 
 class Policy(Protocol[D]):
@@ -172,63 +248,25 @@ class Environment(ABC, Generic[D]):
         pbar: bool = True,
         x0: Optional[D] = None,
         **kwargs: Any,
-    ) -> tuple[
-        D,
-        list[D],
-        list[D],
-        list[D],
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        dict[str, Any],
-    ]:
+    ) -> Sample[D]:
         r"""Sample n trajectories from the environment.
 
         Parameters
         ----------
         n : int
             Number of trajectories to sample.
-
         pbar : bool, default: True
             Whether to display a progress bar.
-
         x0 : D, optional
             Initial states to start the trajectories from. If None, samples from :math:`p_0`.
-
         **kwargs : dict
             Additional keyword arguments to pass to the base model at every timestep (e.g. text
             embedding or class label).
 
         Returns
         -------
-        sample : D
-            The final states :math:`x_1` of the sampled trajectory.
-
-        trajectories : list of D, length discretization_steps+1
-            The sampled trajectories, containing x_t.
-
-        drifts : list of D, length discretization_steps
-            The drift terms at each timestep.
-
-        noises : list of D, length discretization_steps
-            The noise terms at each timestep.
-
-        running_costs : torch.Tensor, shape (discretization_steps, n)
-            The running costs :math:`L(x_t, t)` of the policy at each timestep.
-
-        rewards : torch.Tensor, shape (n,)
-            The final reward for each trajectory, i.e., :math:`r(x_1)`.
-
-        valids : torch.Tensor, shape (n,)
-            The validity indicators for each trajectory (1 if valid, 0 if invalid).
-
-        costs : torch.Tensor, shape (discretization_steps, n)
-            The costs associated with each trajectory, i.e., :math:`c_t = \int_t^1 \| a_s(x_s, s) -
-            \hat{a}_s(x_s, s) \|^2 ds - r(x_1)`.
-
-        kwargs : dict[str, Any]
-            Additional keyword arguments passed to the base model at every timestep.
+        Sample[D]
+            A Sample object containing the sampled trajectories and associated data.
         """
         x, kwargs = self.base_model.sample_p0(n, **kwargs)
 
@@ -238,7 +276,7 @@ class Environment(ABC, Generic[D]):
 
         x, kwargs = self.base_model.preprocess(x, **kwargs)
 
-        trajectories = [x.to("cpu")]
+        trajectory = [x.to("cpu")]
         drifts = []
         noises = []
         running_costs = torch.zeros(self.discretization_steps, n)
@@ -260,16 +298,12 @@ class Environment(ABC, Generic[D]):
             x += dt * drift + torch.sqrt(dt) * diffusion * epsilon
 
             running_costs[i] = running_cost
-            trajectories.append(x.detach().to("cpu"))
+            trajectory.append(x.detach().to("cpu"))
             drifts.append(drift.detach().to("cpu"))
             noises.append(epsilon.detach().to("cpu"))
 
         sample = self.base_model.postprocess(x)
-
-        if self.reward.latent_space:
-            rewards, valids = self.reward(x, **kwargs)
-        else:
-            rewards, valids = self.reward(sample, **kwargs)
+        rewards, valids = self.reward(sample, x, **kwargs)
 
         rewards = rewards.cpu()
         valids = valids.cpu()
@@ -282,4 +316,26 @@ class Environment(ABC, Generic[D]):
         )
         # Reverse cumulative sum
         costs = costs.flip(0).cumsum(0).flip(0)
-        return sample, trajectories, drifts, noises, running_costs, rewards, valids, costs, kwargs
+        return Sample(sample.to("cpu"), x.to("cpu"), trajectory, drifts, noises, running_costs, rewards, valids, costs, kwargs)
+
+    def batch_sample(self, n: int, batch_size: int, **kwargs: Any) -> Sample[D]:
+        """Sample n trajectories from the environment in batches.
+
+        Parameters
+        ----------
+        n : int
+            Number of trajectories to sample.
+        batch_size : int
+            Batch size for sampling.
+        **kwargs : dict
+            Additional keyword arguments to pass to the base model at every timestep (e.g. text
+            embedding or class label).
+        """
+        samples: list[Sample[D]] = []
+
+        for i in range(0, n, batch_size):
+            current_n = min(batch_size, n - i)
+            current_kwargs = index_dict(kwargs, i, i + current_n)
+            samples.append(self.sample(current_n, pbar=False, **current_kwargs))
+
+        return Sample.concat(samples)

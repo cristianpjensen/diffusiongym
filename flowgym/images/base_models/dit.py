@@ -79,10 +79,7 @@ class DiTBaseModel(BaseModel[FlowTensor]):
             class_labels = torch.tensor(class_labels, device=self.device)
 
         if len(class_labels) != n:
-            raise ValueError(
-                "The class_label must be a list of integers with length equal to the "
-                f"batch size, got length {len(class_labels)}."
-            )
+            raise ValueError(f"The class_label must be a list of integers with length equal to the batch size, got length {len(class_labels)}.")
 
         return (
             FlowTensor(torch.randn(n, self.channels, self.dim, self.dim, device=self.device)),

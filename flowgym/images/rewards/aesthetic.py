@@ -37,25 +37,12 @@ class AestheticReward(Reward[FlowTensor]):
             ]
         )
 
-    def __call__(self, x: FlowTensor, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
-        """Compute the image reward for a batch of images.
+    def __call__(self, sample: FlowTensor, latent: FlowTensor, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute the aesthetic score for a batch of images."""
+        if sample.data.min() < 0 or sample.data.max() > 1:
+            raise ValueError(f"`sample` must have values in [0, 1], got [{sample.data.min()}, {sample.data.max()}]")
 
-        Parameters
-        ----------
-        x : tensor, shape (B, C, H, W), values in [0, 1]
-            A batch of images.
-
-        Returns
-        -------
-        rewards : torch.Tensor, shape (B,)
-            Image rewards.
-        """
-        if x.data.min() < 0 or x.data.max() > 1:
-            raise ValueError(
-                f"`x` must have values in [0, 1], got [{x.data.min()}, {x.data.max()}]"
-            )
-
-        preprocessed_imgs = self.preprocess(x.data)
+        preprocessed_imgs = self.preprocess(sample.data)
         rewards = []
         for img_ in preprocessed_imgs:
             img = img_.to(self.device).unsqueeze(0)
@@ -63,7 +50,7 @@ class AestheticReward(Reward[FlowTensor]):
             img_feats /= img_feats.norm(dim=-1, keepdim=True)
             rewards.append(self.model(img_feats))
 
-        return torch.cat(rewards).squeeze(-1), torch.ones(len(x), device=x.device, dtype=torch.bool)
+        return torch.cat(rewards).squeeze(-1), torch.ones(len(sample), dtype=torch.bool)
 
     def _get_aesthetic_model(self, clip_model: str = "vit_l_14") -> nn.Module:
         """Source: https://github.com/LAION-AI/aesthetic-predictor/blob/main/asthetics_predictor.ipynb."""
@@ -72,11 +59,7 @@ class AestheticReward(Reward[FlowTensor]):
         path_to_model = cache_folder + "/sa_0_4_" + clip_model + "_linear.pth"
         if not os.path.exists(path_to_model):
             os.makedirs(cache_folder, exist_ok=True)
-            url_model = (
-                "https://github.com/LAION-AI/aesthetic-predictor/blob/main/sa_0_4_"
-                + clip_model
-                + "_linear.pth?raw=true"
-            )
+            url_model = "https://github.com/LAION-AI/aesthetic-predictor/blob/main/sa_0_4_" + clip_model + "_linear.pth?raw=true"
             urlretrieve(url_model, path_to_model)
 
         if clip_model == "vit_l_14":

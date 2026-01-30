@@ -47,35 +47,16 @@ class IncompressionReward(Reward[FlowTensor]):
     ----------
     quality_level : int, 1-100
         JPEG quality level. Lower values mean higher compression.
-
-    Examples
-    --------
-    >>> reward = IncompressionReward(85)
-    >>> imgs = torch.rand(8, 3, 256, 256)
-    >>> result = reward(imgs)
-    >>> result.shape
-    torch.Size([8])
     """
 
     def __init__(self, quality_level: int = 85):
         self.quality_level = quality_level
 
-    def __call__(self, x: FlowTensor, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
-        """Compute the incompression reward for a batch of images.
-
-        Parameters
-        ----------
-        imgs : tensor, shape (B, C, H, W), values in [0, 1]
-            A batch of images.
-
-        Returns
-        -------
-        rewards : torch.Tensor, shape (B,)
-            Incompression reward (bits per pixel) for each image.
-        """
+    def __call__(self, sample: FlowTensor, latent: FlowTensor, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute the incompression reward for a batch of images."""
         return (
-            _bits_per_pixel(x.data, self.quality_level),
-            torch.ones(len(x), device=x.device, dtype=torch.bool),
+            _bits_per_pixel(sample.data, self.quality_level),
+            torch.ones(len(sample), dtype=torch.bool),
         )
 
 
@@ -90,33 +71,14 @@ class CompressionReward(Reward[FlowTensor]):
     ----------
     quality_level : int, 1-100
         JPEG quality level. Lower values mean higher compression.
-
-    Examples
-    --------
-    >>> reward = CompressionReward(85)
-    >>> imgs = torch.rand(8, 3, 256, 256)
-    >>> result = reward(imgs)
-    >>> result.shape
-    torch.Size([8])
     """
 
     def __init__(self, quality_level: int = 85):
         self.quality_level = quality_level
 
-    def __call__(self, x: FlowTensor, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
-        """Compute the compression reward for a batch of images.
-
-        Parameters
-        ----------
-        x : tensor, shape (B, C, H, W), values in [0, 1]
-            A batch of images.
-
-        Returns
-        -------
-        rewards : torch.Tensor, shape (B,)
-            Compression reward (negative bits per pixel) for each image.
-        """
+    def __call__(self, sample: FlowTensor, latent: FlowTensor, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
+        """Compute the compression reward for a batch of images."""
         return (
-            -_bits_per_pixel(x.data, self.quality_level),
-            torch.ones(len(x), device=x.device, dtype=torch.bool),
+            -_bits_per_pixel(sample.data, self.quality_level),
+            torch.ones(len(sample), dtype=torch.bool),
         )

@@ -40,13 +40,7 @@ class CosineScheduler(Scheduler[FlowTensor]):
 
     def alpha_dot(self, x: FlowTensor, t: torch.Tensor) -> FlowTensor:
         t = t.clamp(min=1e-9)
-        alpha_dot = (
-            0.5
-            * self.nu
-            * torch.pi
-            * torch.pow(t, self.nu - 1)
-            * torch.sin(torch.pow(t, self.nu) * torch.pi)
-        )
+        alpha_dot = 0.5 * self.nu * torch.pi * torch.pow(t, self.nu - 1) * torch.sin(torch.pow(t, self.nu) * torch.pi)
         return FlowTensor(append_dims(alpha_dot, x.data.ndim))
 
 
@@ -64,9 +58,7 @@ class DiffusionScheduler(Scheduler[FlowTensor]):
         super().__init__()
 
         self.alpha_bar = alpha_bar
-        self.alpha_bar_shifted = torch.cat(
-            [torch.ones(1, device=alpha_bar.device, dtype=alpha_bar.dtype), alpha_bar[:-1]], dim=0
-        )
+        self.alpha_bar_shifted = torch.cat([torch.ones(1, device=alpha_bar.device, dtype=alpha_bar.dtype), alpha_bar[:-1]], dim=0)
         self.K = alpha_bar.shape[0] - 1
         self.alpha_bar_dot = self.K * (self.alpha_bar_shifted - self.alpha_bar)
 
