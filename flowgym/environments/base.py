@@ -291,11 +291,15 @@ class Environment(ABC, Generic[D]):
             dt = t1 - t0
             t_curr = t0 * torch.ones(n, device=self.base_model.device)
 
+            x = x.manifold_map()
+
             # Discrete step of SDE
             drift, running_cost = self.drift(x, t_curr, **kwargs)
             diffusion = self.diffusion(x, t_curr)
             epsilon = x.randn_like()
             x += dt * drift + torch.sqrt(dt) * diffusion * epsilon
+
+            x = x.manifold_inv()
 
             running_costs[i] = running_cost
             trajectory.append(x.detach().to("cpu"))

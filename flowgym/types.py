@@ -42,6 +42,14 @@ class FlowProtocol(Protocol):
         ...
 
 
+    def manifold_map(self) -> Self:
+        ...
+
+
+    def manifold_inv(self) -> Self:
+        ...
+
+
 class FlowMixin(FlowProtocol):
     """Mixin for common functionality."""
 
@@ -181,6 +189,14 @@ class FlowMixin(FlowProtocol):
             return g if g is not None else torch.zeros_like(x)
 
         return self.apply(inject_grads)
+
+
+    def manifold_map(self) -> Self:
+        return self
+
+
+    def manifold_inv(self) -> Self:
+        return self
 
 
 class FlowTensor(FlowMixin):

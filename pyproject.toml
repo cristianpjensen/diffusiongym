@@ -13,7 +13,7 @@ dependencies = [
     "torch==2.3.1",
     "tqdm>=4.66,<5",
     "typing-extensions>=4.9,<5",
-    "dgl==2.4",
+    "dgl==2.1",
     "meeko==0.6.1",
     "pandas>=2,<3",
     "pydantic>=1.10,<3",
