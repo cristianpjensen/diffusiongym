@@ -7,28 +7,6 @@ readme = "README.md"
 keywords = []
 authors = [{name = "Cristian Perez Jensen"}]
 requires-python = ">=3.8,<3.12"
-dependencies = [
-    "numpy>=1.24,<2",
-    "polars>=1.34.0,<2",
-    "torch==2.3.1",
-    "tqdm>=4.66,<5",
-    "typing-extensions>=4.9,<5",
-    "dgl==2.1",
-    "meeko==0.6.1",
-    "pandas>=2,<3",
-    "pydantic>=1.10,<3",
-    "prody>=2.4,<3",
-    "rdkit>=2023.9.4,<2025",
-    "rdkit-stubs>=0.6,<0.9",
-    "torchdata>=0.7,<0.9",
-    "pyyaml>=6,<7",
-    "diffusers==0.33.1",
-    "transformers>=4.36",
-    "datasets==2.11.0",
-    "pyarrow==11.0.0",
-    "open-clip-torch>=2.26,<3",
-    "torchvision==0.18.1",
-]
 
 [project.urls]
 Homepage = "https://github.com/cristianpjensen/flowgym"
