@@ -1,7 +1,7 @@
 Rewards
 =======
 
-.. currentmodule:: flowgym.rewards
+.. currentmodule:: diffusiongym.rewards
 
 .. autosummary::
     :toctree: generated/

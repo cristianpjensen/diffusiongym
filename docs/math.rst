@@ -3,7 +3,7 @@ The Math
 
 .. rst-class:: lead
 
-   *flowgym* is built for reward adaptation of flow and diffusion models. Here, we provide a brief
+   *diffusiongym* is built for reward adaptation of flow and diffusion models. Here, we provide a brief
    overview of the mathematical framework used in the library.
 
 Flow models
@@ -27,7 +27,7 @@ where :math:`\alpha_t` and :math:`\beta_t` are scalar functions of time :math:`t
 
 .. note::
 
-   In *flowgym*, :math:`\alpha_t` and :math:`\beta_t` are defined as subclasses of the
+   In *diffusiongym*, :math:`\alpha_t` and :math:`\beta_t` are defined as subclasses of the
    ``Scheduler`` abstract class.
 
 Generally, flow matching trains a velocity field :math:`v(\mathbf{x}_t, t)` to match the time
@@ -56,7 +56,7 @@ From now on, we will view the drift term in :eq:`sde_family` as a constant defin
 
    \mathrm{d} \mathbf{x}_t = b(\mathbf{x}_t, t)\,\mathrm{d}t + \sigma(t)\,\mathrm{d}B_t
 
-where :math:`b(\mathbf{x}_t, t)` is the drift term. The ``Environment`` classes in *flowgym*
+where :math:`b(\mathbf{x}_t, t)` is the drift term. The ``Environment`` classes in *diffusiongym*
 implements Euler-Maruyama sampling of this SDE, where the drift is defined through a ``BaseModel``.
 
 .. note::
@@ -77,7 +77,7 @@ is to adapt the drift term in :eq:`sde` such that samples :math:`\mathbf{x}_1` h
 
 .. note::
 
-   In *flowgym*, reward functions are implemented as subclasses of the ``Reward`` abstract class.
+   In *diffusiongym*, reward functions are implemented as subclasses of the ``Reward`` abstract class.
 
 A common objective is KL-regularized reward maximization:
 
@@ -135,7 +135,7 @@ function to be differentiable.
 
 .. note::
 
-   To facilitate this, *flowgym* provides the ``ValuePolicy`` class that derives the optimal control for the
+   To facilitate this, *diffusiongym* provides the ``ValuePolicy`` class that derives the optimal control for the
    value function approximator. This can be used with the ``Environment`` class by setting the
    ``control_policy`` property.
 

@@ -1,24 +1,24 @@
-# Flow Gym
+# Diffusion Gym
 
 <div align="center">
   <img src="docs/_static/teaser.gif" width="100%" />
 </div>
 
 <p align="center">
-<a href="https://github.com/cristianpjensen/flow-gym/blob/master/LICENSE"><img alt="License" src="https://img.shields.io/github/license/cristianpjensen/flowgym"></a>
+<a href="https://github.com/cristianpjensen/diffusiongym/blob/master/LICENSE"><img alt="License" src="https://img.shields.io/github/license/cristianpjensen/diffusiongym"></a>
 <a href="https://github.com/astral-sh/ruff"><img alt="Code style: ruff" src="https://img.shields.io/badge/code%20style-ruff-000000.svg"></a>
 </p>
 
-`flowgym` is a library for reward adaptation of any pre-trained flow model on any data modality.
+`diffusiongym` is a library for reward adaptation of any pre-trained flow model on any data modality.
 
 ## Installation
 
-In order to install *flowgym*, execute the following command:
+In order to install *diffusiongym*, execute the following command:
 ```bash
-pip install flowgym
+pip install diffusiongym
 ```
 
-*flowgym* requires PyTorch 2.3.1, and there may be other hard dependencies. Please open an issue if
+*diffusiongym* requires PyTorch 2.3.1, and there may be other hard dependencies. Please open an issue if
 installation fails through the above command.
 
 Molecule environments depend on [FlowMol](https://github.com/cristianpjensen/FlowMol),
@@ -34,8 +34,8 @@ pip install git+https://github.com/openai/CLIP.git
 
 ## High-level overview
 
-Diffusion and flow models are largely agnostic to their data modality. They only require that the underlying data type supports a small set of operations. Building on this idea, *flowgym* is designed to be fully modular. You only need to provide the following:
- * Data type `YourDataType` that implements `FlowProtocol`, which defines some functions necessary for interacting with it as a flow model.
+Diffusion and flow models are largely agnostic to their data modality. They only require that the underlying data type supports a small set of operations. Building on this idea, *diffusiongym* is designed to be fully modular. You only need to provide the following:
+ * Data type `YourDataType` that implements `DDProtocol`, which defines some functions necessary for interacting with it as a flow model.
  * Base model `BaseModel[YourDataType]`, which defines the scheduler, how to sample $p_0$, how to compute the forward pass, and how to preprocess and postprocess data.
  * Reward function `Reward[YourDataType]`.
 
@@ -43,4 +43,16 @@ Once these are defined, you can sample from the flow model and apply reward adap
 
 ## Documentation
 
-Much more information can be found in [the documentation](https://cristianpjensen.github.io/flowgym/), including tutorials and API references.
+Much more information can be found in [the documentation](https://cristianpjensen.github.io/diffusiongym/), including tutorials and API references.
+
+## Citation
+
+If this library is useful to you, consider citing the following work:
+```
+@inproceedings{jensen2026value,
+  title={Value Matching: Scalable and Gradient-Free Reward-Guided Flow Adaptation},
+  author={Cristian Perez Jensen and Luca Schaufelberger and Riccardo De Santi and Kjell Jorner and Andreas Krause},
+  booktitle={The Fourteenth International Conference on Learning Representations},
+  year={2026},
+}
+```

@@ -1,5 +1,5 @@
 Version 1.11
------------
+------------
 
 - Added keyword argument support for ``train_base_model``.
 - Removed timestep-dependent loss for FlowMol in ``train_loss`` method, which is much more memory- and time-efficient.

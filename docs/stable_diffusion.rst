@@ -3,13 +3,13 @@ Tutorial: Stable Diffusion
 
 .. rst-class:: lead
 
-   A tutorial on how to define Stable Diffusion 1.5 as a base model in *flowgym*.
+   A tutorial on how to define Stable Diffusion 1.5 as a base model in *diffusiongym*.
 
 Data type
 ---------
 
-For images, we can simply use tensors as the datatype. *flowgym* already has a wrapper for this in
-``FlowTensor``. See :ref:`flowgym/types.py` for implementation details.
+For images, we can simply use tensors as the datatype. *diffusiongym* already has a wrapper for this in
+``DDTensor``. See :ref:`diffusiongym/types.py` for implementation details.
 
 Scheduler
 ---------
@@ -42,7 +42,7 @@ And we compute its time derivative by finite differences:
 
    \dot{\bar{\gamma}}_t = T \cdot \left( \bar{\gamma}\lfloor T(1-t) - 1 \rfloor - \bar{\gamma}\lfloor T(1-t) \rfloor \right)
 
-*flowgym* implements this through ``DiffusionScheduler`` which takes the :math:`\bar{\gamma}`
+*diffusiongym* implements this through ``DiffusionScheduler`` which takes the :math:`\bar{\gamma}`
 noise schedule as input.
 
 Base model
@@ -54,10 +54,10 @@ obtain the base model through their API:
 .. code-block:: python
 
    from diffusers import StableDiffusionPipeline
-   from flowgym import BaseModel, FlowTensor, base_model_registry
+   from diffusiongym import BaseModel, DDTensor, base_model_registry
 
    @base_model_registry.register("images/stable_diffusion")
-   class StableDiffusionBaseModel(BaseModel[FlowTensor]):
+   class StableDiffusionBaseModel(BaseModel[DDTensor]):
       output_type = "epsilon"
 
       def __init__(self, device):
@@ -71,7 +71,7 @@ We then set the scheduler as follows:
 
 .. code-block:: python
 
-   from flowgym import DiffusionScheduler
+   from diffusiongym import DiffusionScheduler
 
    # In StableDiffusionBaseModel.__init__
    alphas_cumprod = self.pipe.scheduler.alphas_cumprod.to(device)
@@ -100,7 +100,7 @@ dataset.
       if isinstance(prompt, str):
          prompt = [prompt] * n
 
-      return FlowTensor(latents), { "prompt": prompt }
+      return DDTensor(latents), { "prompt": prompt }
 
 Preprocessing
 ^^^^^^^^^^^^^
@@ -110,7 +110,7 @@ In order for the U-net base model to make predictions, we need to encode the pro
 .. code-block:: python
 
    # In StableDiffusionBaseModel
-   def preprocess(self, x: FlowTensor, **kwargs):
+   def preprocess(self, x: DDTensor, **kwargs):
       prompt_embeds, _ = self.pipe.encode_prompt(prompt, self.device, 1, False)
       return x, { "encoder_hidden_states": prompt_embeds }
 
@@ -123,13 +123,13 @@ U-net model, which predicts the noise:
 .. code-block:: python
 
    # In StableDiffusionBaseModel
-   def forward(self, x: FlowTensor, t: torch.Tensor, **kwargs):
+   def forward(self, x: DDTensor, t: torch.Tensor, **kwargs):
       y = x.data
       k = self.scheduler.model_input(t)
-      return FlowTensor(self.pipe.unet(y, k, kwargs["encoder_hidden_states"]).sample)
+      return DDTensor(self.pipe.unet(y, k, kwargs["encoder_hidden_states"]).sample)
 
 This can additionally be altered by adding classifier-free guidance, as in
-:ref:`flowgym/images/base_models/stable_diffusion.py`.
+:ref:`diffusiongym/images/base_models/stable_diffusion.py`.
 
 Postprocessing
 ^^^^^^^^^^^^^^
@@ -139,12 +139,12 @@ Lastly, we need to decode the latents back into images through the VAE decoder:
 .. code-block:: python
 
    # In StableDiffusionBaseModel
-   def postprocess(self, x: FlowTensor, **kwargs):
+   def postprocess(self, x: DDTensor, **kwargs):
       y = x.data / self.pipe.vae.config.scaling_factor
       images = self.pipe.vae.decode(y).sample
       images = (images + 1) / 2
       images = images.clamp(0, 1)
-      return FlowTensor(images)
+      return DDTensor(images)
 
 Reward function
 ---------------
@@ -155,24 +155,24 @@ are valid, we output all ones for the second return value:
 
 .. code-block:: python
 
-   from flowgym import Reward, FlowTensor
+   from diffusiongym import Reward, DDTensor
 
    @reward_registry.register("images/red")
-   class RednessReward(Reward[FlowTensor]):
-      def forward(self, x: FlowTensor, **kwargs):
+   class RednessReward(Reward[DDTensor]):
+      def forward(self, x: DDTensor, **kwargs):
          red_channel = x.data[:, 0, :, :]
          return red_channel.mean(dim=(1, 2)).cpu(), torch.ones(x.shape[0])
 
 Environment
 -----------
 
-Now we can combine the base model and reward function into a *flowgym* environment:
+Now we can combine the base model and reward function into a *diffusiongym* environment:
 
 .. code-block:: python
 
-   from flowgym import VelocityEnvironment, flowgym
+   import diffusiongym
 
-   env = flowgym.make(
+   env = diffusiongym.make(
       "images/stable_diffusion",
       "images/red",
       discretization_steps=50,

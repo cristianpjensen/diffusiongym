@@ -20,7 +20,7 @@ as the control policy:
 
 .. code-block:: python
 
-   from flowgym import ControlPolicy
+   from diffusiongym import ControlPolicy
 
    control_policy = ControlPolicy(your_control_network)
    env.control_policy = control_policy

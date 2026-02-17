@@ -877,6 +877,33 @@ packages:
   - jinja2 ; extra == 'training'
   - peft>=0.6.0 ; extra == 'training'
   requires_python: '>=3.8.0'
+- pypi: ./
+  name: diffusiongym
+  version: 2.0.0
+  sha256: 109a1796cd3d03b9c5e8265db428b1efb8298deef055ab30e292eb28406a970b
+  requires_dist:
+  - numpy>=1.24,<2
+  - polars>=1.34.0,<2
+  - torch==2.3.1
+  - tqdm>=4.66,<5
+  - typing-extensions>=4.9,<5
+  - dgl==2.4
+  - meeko==0.6.1
+  - pandas>=2,<3
+  - pydantic>=1.10,<3
+  - prody>=2.4,<3
+  - rdkit>=2023.9.4,<2025
+  - rdkit-stubs>=0.6,<0.9
+  - torchdata>=0.7,<0.9
+  - pyyaml>=6,<7
+  - diffusers==0.33.1
+  - transformers>=4.36
+  - datasets==2.11.0
+  - pyarrow==11.0.0
+  - open-clip-torch>=2.26,<3
+  - torchvision==0.18.1
+  requires_python: '>=3.8,<3.12'
+  editable: true
 - pypi: https://files.pythonhosted.org/packages/be/e3/a84bf2e561beed15813080d693b4b27573262433fced9c1d1fea59e60553/dill-0.3.6-py3-none-any.whl
   name: dill
   version: 0.3.6
@@ -943,33 +970,6 @@ packages:
   - pkg:pypi/filelock?source=hash-mapping
   size: 17976
   timestamp: 1759948208140
-- pypi: ./
-  name: flowgym
-  version: '1.13'
-  sha256: de69fb74a7b4252b0d7bfcf3d6f5553407d32735d3df778aff793bc0e44ef469
-  requires_dist:
-  - numpy>=1.24,<2
-  - polars>=1.34.0,<2
-  - torch==2.3.1
-  - tqdm>=4.66,<5
-  - typing-extensions>=4.9,<5
-  - dgl==2.4
-  - meeko==0.6.1
-  - pandas>=2,<3
-  - pydantic>=1.10,<3
-  - prody>=2.4,<3
-  - rdkit>=2023.9.4,<2025
-  - rdkit-stubs>=0.6,<0.9
-  - torchdata>=0.7,<0.9
-  - pyyaml>=6,<7
-  - diffusers==0.33.1
-  - transformers>=4.36
-  - datasets==2.11.0
-  - pyarrow==11.0.0
-  - open-clip-torch>=2.26,<3
-  - torchvision==0.18.1
-  requires_python: '>=3.8,<3.12'
-  editable: true
 - pypi: git+https://github.com/cristianpjensen/FlowMol.git?rev=8f4c98cbe68111e4e63480b250d925b6d960d3bc#8f4c98cbe68111e4e63480b250d925b6d960d3bc
   name: flowmol
   version: 0.1.2

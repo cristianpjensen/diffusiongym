@@ -1,7 +1,7 @@
 Environments
 ============
 
-.. currentmodule:: flowgym.environments
+.. currentmodule:: diffusiongym.environments
 
 .. autosummary::
     :toctree: generated/

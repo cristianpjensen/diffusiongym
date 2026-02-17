@@ -1,21 +1,23 @@
 Molecules
 =========
 
-.. currentmodule:: flowgym.molecules
+.. currentmodule:: diffusiongym.molecules
 
 .. autosummary::
     :toctree: generated/
     :template: class.rst
     :nosignatures:
 
-    FlowGraph
+    DDGraph
     FlowMolBaseModel
     QM9BaseModel
     GEOMBaseModel
-    MoleculeReward
-    BatchedMoleculeReward
+    EnergyReward
+    HOMOReward
+    LUMOReward
+    HOMOLUMOGapReward
+    PolarizabilityReward
+    HeatCapacityReward
     DipoleMomentReward
-    TargetDipoleMomentReward
-    ProteinDockingReward
     QEDReward
     ValidityReward

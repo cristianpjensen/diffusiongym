@@ -1,7 +1,7 @@
 Base Models
 ===========
 
-.. currentmodule:: flowgym.base_models
+.. currentmodule:: diffusiongym.base_models
 
 .. autosummary::
     :toctree: generated/

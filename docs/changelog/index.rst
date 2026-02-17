@@ -5,9 +5,11 @@ Changelog
 
 .. rst-class:: lead
 
-   This is the changelog of Flow Gym.
+   This is the changelog of Diffusion Gym.
 
 ----
+
+.. include:: includes/2.0.rst
 
 .. include:: includes/1.13.rst
 

@@ -1,7 +1,7 @@
 Images
 ======
 
-.. currentmodule:: flowgym.images
+.. currentmodule:: diffusiongym.images
 
 .. autosummary::
     :toctree: generated/
@@ -16,4 +16,3 @@ Images
     CompressionReward
     IncompressionReward
     AestheticReward
-    ImageReward

@@ -1,4 +1,4 @@
-"""Sphinx configuration file for Flow Gym documentation."""
+"""Sphinx configuration file for diffusiongym documentation."""
 
 import os
 import sys
@@ -17,7 +17,7 @@ from sphinxawesome_theme.postprocess import Icons
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-project = "Flow Gym"
+project = "Diffusion Gym"
 copyright = "2025, Cristian Perez Jensen"
 author = "Cristian Perez Jensen"
 
@@ -50,7 +50,7 @@ html_use_index = False
 html_domain_indices = False
 html_copy_source = False
 html_permalinks_icon = Icons.permalinks_icon
-html_baseurl = "https://cristianpjensen.github.io/flowgym/"
+html_baseurl = "https://cristianpjensen.github.io/diffusiongym/"
 html_context = {
     "mode": "production",
 }
@@ -68,10 +68,10 @@ autodoc_mock_imports = ["flowmol", "torch_scatter"]
 theme_options = ThemeOptions(
     show_prev_next=True,
     awesome_external_links=True,
-    main_nav_links={"Docs": "/flowgym/index", "Changelog": "/flowgym/changelog/index"},
+    main_nav_links={"Docs": "/diffusiongym/index", "Changelog": "/diffusiongym/changelog/index"},
     extra_header_link_icons={
         "Repository on GitHub": {
-            "link": "https://github.com/cristianpjensen/flowgym",
+            "link": "https://github.com/cristianpjensen/diffusiongym",
             "icon": (
                 '<svg height="26px" style="margin-top:-2px;display:inline" '
                 'viewBox="0 0 45 44" '

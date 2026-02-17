@@ -1,0 +1,8 @@
+Version 2.0
+-----------
+
+- Re-named the project to Diffusion Gym.
+- Added ``min_cfg_scale`` and ``max_cfg_scale`` argument to the Stable Diffusion base model for random guidance scales during sampling.
+- Added optional ``pred`` argument to ``BaseModel.train_loss``.
+- Re-named variables to use ``DD`` short for Diffusion Data instead of Flow. I.e.: ``DDProtocol``
+    -> ``DDProtocol``, ``FlowMixin`` -> ``DDMixin``, ``FlowTensor`` -> ``DDTensor``, ``FlowDataset`` -> ``DDDataset``, ``FlowGraph`` -> ``DDGraph``.

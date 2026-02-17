@@ -1,14 +1,14 @@
 Types
 =====
 
-.. currentmodule:: flowgym.types
+.. currentmodule:: diffusiongym.types
 
 .. autosummary::
     :toctree: generated/
     :template: class.rst
     :nosignatures:
 
-    FlowProtocol
-    FlowMixin
+    DDProtocol
+    DDMixin
     D
-    FlowTensor
+    DDTensor

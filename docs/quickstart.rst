@@ -6,7 +6,7 @@ This quickstart guides you through how to define your own data type, base model,
 Data type
 ---------
 
-In order to sample a base model and use it for reward adaptation, you need to first define a data type for your modality. This data type must implement the ``FlowProtocol``, which defines:
+In order to sample a base model and use it for reward adaptation, you need to first define a data type for your modality. This data type must implement the ``DDProtocol``, which defines:
 
 - ``apply``, which applies a unary operation on the underlying data.
 - ``combine``, which applies a binary operation on the underlying data.
@@ -14,7 +14,7 @@ In order to sample a base model and use it for reward adaptation, you need to fi
 - ``collate``, which collates a list of data type instances into a batched instance.
 - ``__len__`` and ``__getitem__`` to support indexing.
 
-See ``flowgym/types.py`` for more details on the methods, and see ``flowgym/molecules/types.py`` for an example implementation for molecules using an underlying DGL graph.
+See ``diffusiongym/types.py`` for more details on the methods, and see ``diffusiongym/molecules/types.py`` for an example implementation for molecules using an underlying DGL graph.
 
 Base model
 ----------
@@ -23,7 +23,7 @@ Next, you need to define a base model that operates on this data type. This base
 
 - ``scheduler (Scheduler[YourDataType])``: The :math:`(\alpha_t, \beta_t)` flow matching schedule.
 - ``sample_p0``: How to sample from :math:`p_0`.
-- ``forward``: The forward pass of the base model, which takes in :math:`(x_t, t)` and outputs one of the following: marginal noise :math:`\epsilon`, velocity :math:`v`, endpoint :math:`x_1`, or score :math:`\nabla_x \log p_t(x_t)`. Make sure to set ``output_type`` accordingly, so ``flowgym.make`` will know what environment to use.
+- ``forward``: The forward pass of the base model, which takes in :math:`(x_t, t)` and outputs one of the following: marginal noise :math:`\epsilon`, velocity :math:`v`, endpoint :math:`x_1`, or score :math:`\nabla_x \log p_t(x_t)`. Make sure to set ``output_type`` accordingly, so ``diffusiongym.make`` will know what environment to use.
 - ``preprocess``: Preprocess procedure to convert :math:`x_0` and any keyword arguments (e.g., to encode prompts).
 - ``postprocess``: Postprocess procedure to convert :math:`x_1` to the desired output format (e.g., convert from latent space to pixel space in latent diffusion models).
 
@@ -42,7 +42,7 @@ Assuming you have defined ``YourBaseModel`` to predict the velocity field, you c
 
 .. code-block:: python
 
-   from flowgym import VelocityEnvironment
+   from diffusiongym import VelocityEnvironment
 
    base_model = YourBaseModel(...)
    reward = YourReward(...)
