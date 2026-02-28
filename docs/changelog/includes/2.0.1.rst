@@ -1,0 +1,5 @@
+Version 2.0.1
+-------------
+
+- Option to specify CFG scale in ``env.sample``.
+- Move keyword arguments to CPU before returning from ``env.sample``.

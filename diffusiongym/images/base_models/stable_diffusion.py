@@ -114,10 +114,19 @@ class StableDiffusionBaseModel(BaseModel[DDTensor]):
         The base distribution :math:`p_0` is a standard Gaussian distribution.
         """
         prompt = kwargs.get("prompt", None)
+        cfg_scale = kwargs.get("cfg_scale", None)
 
         # If no prompt is provided, sample them
         if prompt is None:
             prompt = random.choices(self.prompts, k=n)
+
+        if cfg_scale is None:
+            cfg_scale = torch.full((n,), self.cfg_scale)
+            if (self.min_cfg_scale is not None) and (self.max_cfg_scale is not None):
+                cfg_scale = torch.rand(n) * (self.max_cfg_scale - self.min_cfg_scale) + self.min_cfg_scale
+
+        if isinstance(cfg_scale, float) or len(cfg_scale) == 1:
+            cfg_scale = cfg_scale * torch.ones((n,))
 
         # If a single prompt is provided, replicate it
         if not isinstance(prompt, list):
@@ -126,9 +135,12 @@ class StableDiffusionBaseModel(BaseModel[DDTensor]):
         if len(prompt) != n:
             raise ValueError(f"The prompt must be a list of strings with length equal to the batch size, got length {len(prompt)}.")
 
+        if len(cfg_scale) != n:
+            raise ValueError(f"The cfg scale tensor must be length equal to the batch size, got length {len(cfg_scale)}.")
+
         return (
             DDTensor(torch.randn(n, self.channels, self.dim, self.dim, device=self.device)),
-            {"prompt": prompt},
+            {"prompt": prompt, "cfg_scale": cfg_scale},
         )
 
     def preprocess(self, x: DDTensor, **kwargs: Any) -> tuple[DDTensor, dict[str, Any]]:
@@ -179,16 +191,11 @@ class StableDiffusionBaseModel(BaseModel[DDTensor]):
             else:
                 encoder_hidden_states = prompt_embeds
 
-        # Sample CFG scales
-        cfg_scale = torch.full((n,), self.cfg_scale, device=x.device)
-        if (self.min_cfg_scale is not None) and (self.max_cfg_scale is not None):
-            cfg_scale = torch.rand(n, device=x.device) * (self.max_cfg_scale - self.min_cfg_scale) + self.min_cfg_scale
-
         return x, {
             "encoder_hidden_states": encoder_hidden_states,
             "prompt": prompt,
             "neg_prompt": neg_prompt,
-            "cfg_scale": cfg_scale,
+            "cfg_scale": kwargs["cfg_scale"].to(x.device),
         }
 
     def postprocess(self, x: DDTensor) -> DDTensor:

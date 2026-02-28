@@ -1,5 +1,5 @@
-Version 2.0
------------
+Version 2.0.0
+-------------
 
 - Re-named the project to Diffusion Gym.
 - Added ``min_cfg_scale`` and ``max_cfg_scale`` argument to the Stable Diffusion base model for random guidance scales during sampling.

@@ -75,14 +75,43 @@ def index_dict(d: T, start: int, end: Optional[int] = None) -> T:
     if isinstance(d, dict):
         return {k: index_dict(v, start, end) for k, v in d.items()}  # type: ignore
 
-    elif isinstance(d, (list, tuple, torch.Tensor)):
+    if isinstance(d, (list, tuple, torch.Tensor)):
         return d[idx]  # type: ignore
 
-    elif isinstance(d, (float, int, str)):
+    if isinstance(d, (float, int, str)):
         return d
 
-    else:
-        raise TypeError(f"Unsupported leaf type: {type(d)}")
+    raise TypeError(f"Unsupported leaf type: {type(d)}")
+
+
+def dict_to_device(d: T, device: torch.device | str) -> T:
+    """Recursively move the leaves of a nested dictionary to a specified device.
+
+    Parameters
+    ----------
+    d : T
+        Any value, if a dictionary, will be processed recursively.
+    device : torch.device
+        The device to move tensor leaves to.
+
+    Returns
+    -------
+    T
+        If d is a dictionary, returns a dictionary with the same keys and device-moved leaves.
+    """
+    if isinstance(d, dict):
+        return {k: dict_to_device(v, device) for k, v in d.items()}
+
+    if isinstance(d, list):
+        return [dict_to_device(v, device) for v in d]
+
+    if isinstance(d, torch.Tensor):
+        return d.to(device)  # type: ignore
+
+    if isinstance(d, (float, int, str)):
+        return d
+
+    raise TypeError(f"Unsupported leaf type: {type(d)}")
 
 
 @contextmanager
@@ -240,6 +269,8 @@ def train_base_model(
         x1_cpu: D
         x1 = x1_cpu.to(base_model.device)
         weight = weight.to(base_model.device)
+        kwargs = dict_to_device(kwargs, base_model.device)
+
         loss = (weight * base_model.train_loss(x1, **kwargs)).mean()
         loss_sum += loss.item()
 

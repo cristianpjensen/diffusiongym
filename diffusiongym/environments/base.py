@@ -7,13 +7,13 @@ from typing import Any, Generic, Iterable, Optional, Protocol
 
 import torch
 from torch.utils.data._utils.collate import default_collate
-from tqdm.auto import tqdm
+from tqdm.auto import tqdm, trange
 
 from diffusiongym.base_models import BaseModel
 from diffusiongym.rewards import Reward
 from diffusiongym.schedulers import MemorylessNoiseSchedule, Scheduler
 from diffusiongym.types import D
-from diffusiongym.utils import index_dict
+from diffusiongym.utils import dict_to_device, index_dict
 
 
 @dataclass
@@ -356,6 +356,7 @@ class Environment(ABC, Generic[D]):
         )
         # Reverse cumulative sum
         costs = costs.flip(0).cumsum(0).flip(0)
+        kwargs = dict_to_device(kwargs, "cpu")
         return Sample(sample.to("cpu"), x.to("cpu"), trajectory, t, drifts, diffusions, noises, running_costs, rewards, valids, costs, kwargs)
 
     def batch_sample(self, n: int, batch_size: int, pbar: bool = False, **kwargs: Any) -> Sample[D]:
@@ -375,9 +376,10 @@ class Environment(ABC, Generic[D]):
         """
         samples: list[Sample[D]] = []
 
-        for i in range(0, n, batch_size):
+        iterator = trange(0, n, batch_size) if pbar else range(0, n, batch_size)
+        for i in iterator:
             current_n = min(batch_size, n - i)
             current_kwargs = index_dict(kwargs, i, i + current_n)
-            samples.append(self.sample(current_n, pbar=pbar, **current_kwargs))
+            samples.append(self.sample(current_n, pbar=False, **current_kwargs))
 
         return Sample.concat(samples)
